@@ -15,16 +15,16 @@ export async function GET() {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://mp3towav.net/download</loc>
+    <loc>https://mp3towav.net/share</loc>
     <lastmod>${currentDate}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://mp3towav.net/share</loc>
+    <loc>https://mp3towav.net/download</loc>
     <lastmod>${currentDate}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
 </urlset>`
 
