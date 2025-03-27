@@ -984,21 +984,54 @@ export function MP3toWAVConverter() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
   };
 
-  // Modify share function, remove social media share options
-  const handleShare = () => {
-    try {
-      navigator.clipboard.writeText(window.location.href);
+  // 修改分享功能，创建24小时有效的分享链接
+  const handleShare = async () => {
+    if (!downloadUrl) {
       toast({
-        title: "Link copied",
-        description: "Link has been copied to your clipboard.",
-      });
-    } catch (error) {
-      console.error('Copy failed:', error);
-      toast({
-        title: "Copy failed",
-        description: "Could not copy the link. Please try again.",
+        title: "Error",
+        description: "Please convert a file first before sharing.",
         variant: "destructive",
       });
+      return;
+    }
+
+    try {
+      setIsConverting(true); // 显示加载状态
+      
+      // 调用后端API创建分享链接
+      const response = await fetch('/api/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: fileId,
+          originalName: originalName || 'converted.wav'
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create share link');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Unknown error creating share link');
+      }
+      
+      // 跳转到分享页面
+      window.location.href = `/share?url=${encodeURIComponent(data.shareUrl)}`;
+      
+    } catch (error) {
+      console.error('Share error:', error);
+      toast({
+        title: "Share failed",
+        description: "Could not create share link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConverting(false); // 隐藏加载状态
     }
   };
 
@@ -1497,17 +1530,10 @@ export function MP3toWAVConverter() {
                         
                         <Button
                           variant="outline"
-                          onClick={() => {
-                            // Directly copy link to clipboard
-                            navigator.clipboard.writeText(window.location.href);
-                            toast({
-                              title: "Link copied",
-                              description: "Link has been copied to your clipboard.",
-                            });
-                          }}
+                          onClick={handleShare}
                           className="gap-2"
                         >
-                          <Share2 className="h-4 w-4" /> Copy Share Link
+                          <Share2 className="h-4 w-4" /> Share File
                         </Button>
                       </div>
                     </div>
