@@ -535,10 +535,11 @@ export async function POST(request: NextRequest) {
 // 获取转换后的文件
 export async function GET(request: NextRequest) {
   try {
-    const fileId = request.nextUrl.searchParams.get('fileId');
+    const { searchParams } = new URL(request.url);
+    const fileId = searchParams.get('id');
     
     if (!fileId) {
-      return NextResponse.json({ error: 'No file ID provided' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing file ID parameter' }, { status: 400 });
     }
     
     const filePath = path.join(TMP_DIR, `${fileId}.wav`);
@@ -549,17 +550,32 @@ export async function GET(request: NextRequest) {
     
     const fileBuffer = fs.readFileSync(filePath);
     
-    // 设置响应头部
-    const headers = new Headers();
-    headers.set('Content-Type', 'audio/wav');
-    headers.set('Content-Disposition', `attachment; filename=${fileId}.wav`);
-    
+    // 返回文件并添加CORS和缓存控制头部
     return new NextResponse(fileBuffer, {
-      status: 200,
-      headers
+      headers: {
+        'Content-Type': 'audio/wav',
+        'Content-Disposition': `attachment; filename="${fileId}.wav"`,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Cache-Control': 'public, max-age=86400'
+      }
     });
   } catch (error) {
-    console.error('File download error:', error);
-    return NextResponse.json({ error: 'File download failed' }, { status: 500 });
+    console.error('获取文件错误:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+// 添加OPTIONS方法处理CORS预检请求
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400'
+    }
+  });
 } 
