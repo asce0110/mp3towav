@@ -690,6 +690,34 @@ export function MP3toWAVConverter() {
       const blob = new Blob([wavBuffer], { type: 'audio/wav' });
       const url = URL.createObjectURL(blob);
       
+      setProgress(90);
+      
+      // 为客户端转换生成唯一的文件ID
+      const clientFileId = generateUniqueId();
+      setFileId(clientFileId);
+      
+      // 上传至服务器（可选）
+      try {
+        // 创建FormData
+        const formData = new FormData();
+        formData.append('file', blob, `${originalName || 'converted'}.wav`);
+        formData.append('clientFileId', clientFileId);
+        
+        // 静默上传到服务器以支持分享功能
+        fetch('/api/upload-client-wav', {
+          method: 'POST',
+          body: formData
+        }).then(response => {
+          if (response.ok) {
+            console.log('Client-converted WAV uploaded to server for sharing');
+          }
+        }).catch(err => {
+          console.error('Failed to upload client-converted WAV:', err);
+        });
+      } catch (uploadError) {
+        console.error('Error preparing upload:', uploadError);
+      }
+      
       setProgress(100);
       
       // Set download URL
@@ -995,8 +1023,21 @@ export function MP3toWAVConverter() {
       return;
     }
 
+    // 确保有fileId
+    if (!fileId) {
+      toast({
+        title: "Error",
+        description: "File ID is missing. Please try converting again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsConverting(true); // 显示加载状态
+      
+      // 输出调试信息
+      console.log('Sharing file with ID:', fileId);
       
       // 调用后端API创建分享链接
       const response = await fetch('/api/share', {
@@ -1011,6 +1052,7 @@ export function MP3toWAVConverter() {
       });
       
       if (!response.ok) {
+        console.error('Share API error:', response.status, response.statusText);
         throw new Error('Failed to create share link');
       }
       
