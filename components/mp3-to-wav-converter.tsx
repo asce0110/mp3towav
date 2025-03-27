@@ -1012,7 +1012,7 @@ export function MP3toWAVConverter() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
   };
 
-  // 修改分享功能，创建24小时有效的分享链接
+  // 修改分享功能，直接跳转到分享页面
   const handleShare = async () => {
     if (!downloadUrl) {
       toast({
@@ -1034,47 +1034,20 @@ export function MP3toWAVConverter() {
     }
 
     try {
-      setIsConverting(true); // 显示加载状态
-      
       // 输出调试信息
       console.log('Sharing file with ID:', fileId);
       
-      // 调用后端API创建分享链接
-      const response = await fetch('/api/share', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fileId: fileId,
-          originalName: originalName || 'converted.wav'
-        }),
-      });
-      
-      if (!response.ok) {
-        console.error('Share API error:', response.status, response.statusText);
-        throw new Error('Failed to create share link');
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Unknown error creating share link');
-      }
-      
-      // 直接跳转到分享页面 - 修复跳转URL格式
-      const sharePageUrl = `/share/${data.shareId}`;
+      // 直接跳转到分享页面，不再调用API，使用fileId作为分享ID
+      const sharePageUrl = `/share/${fileId}`;
       window.location.href = sharePageUrl;
       
     } catch (error) {
       console.error('Share error:', error);
       toast({
         title: "Share failed",
-        description: "Could not create share link. Please try again.",
+        description: "Could not navigate to share page. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsConverting(false); // 隐藏加载状态
     }
   };
 
