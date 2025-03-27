@@ -1012,7 +1012,7 @@ export function MP3toWAVConverter() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
   };
 
-  // 修改分享功能，直接跳转到分享页面
+  // 修改分享功能，跳转到分享页面并填充链接
   const handleShare = async () => {
     if (!downloadUrl) {
       toast({
@@ -1037,9 +1037,12 @@ export function MP3toWAVConverter() {
       // 输出调试信息
       console.log('Sharing file with ID:', fileId);
       
-      // 直接跳转到分享页面，不再调用API，使用fileId作为分享ID
-      const sharePageUrl = `/share/${fileId}`;
-      window.location.href = sharePageUrl;
+      // 创建完整的分享链接
+      const origin = window.location.origin;
+      const fullShareUrl = `${origin}/share/${fileId}`;
+      
+      // 跳转到分享页面，传递分享链接作为url参数
+      window.location.href = `/share?url=${encodeURIComponent(fullShareUrl)}`;
       
     } catch (error) {
       console.error('Share error:', error);
