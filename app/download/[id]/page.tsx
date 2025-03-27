@@ -8,6 +8,7 @@ import { Loader2, Home, Download, Play, Pause, Volume2 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { Slider } from "@/components/ui/slider"
 import Head from "next/head"
+import { SiteHeader } from "@/components/site-header"
 
 export default function DownloadPage() {
   const router = useRouter()
@@ -467,12 +468,13 @@ export default function DownloadPage() {
   
   return (
     <>
+      <SiteHeader />
       <Head>
         <title>MP3 to WAV Download | Get Your Converted Audio File</title>
         <meta name="description" content="Download your MP3 to WAV converted file. Preview before downloading, adjust playback volume, and share high-quality WAV files. Fast and reliable conversion." />
       </Head>
       
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900 p-4">
+      <div className="container max-w-4xl mx-auto px-4 py-12">
         <Card className="w-full max-w-2xl bg-white shadow-lg">
           <CardHeader className="bg-[#2A6FDB] text-white">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
@@ -483,9 +485,9 @@ export default function DownloadPage() {
           
           <CardContent className="p-6">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-12 w-12 text-[#2A6FDB] animate-spin mb-4" />
-                <p className="text-gray-500">Loading your file...</p>
+              <div className="flex flex-col items-center justify-center p-12">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <h2 className="text-xl font-semibold">Loading your file...</h2>
               </div>
             ) : (
               <div className="space-y-8">

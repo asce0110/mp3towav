@@ -38,6 +38,14 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/sitemap.xml',
+        destination: '/api/sitemap',
+      },
+    ];
+  },
   serverRuntimeConfig: {
     maxBodySize: '500mb', // 设置最大上传大小为 500MB
   },

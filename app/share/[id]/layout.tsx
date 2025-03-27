@@ -2,14 +2,14 @@ import type { Metadata } from 'next'
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'MP3 to WAV Download | Get Your Converted Audio File',
-  description: 'Download your MP3 to WAV converted file. Preview before downloading, adjust playback volume, and share high-quality WAV files with others. Fast and reliable conversion.',
+  title: 'MP3 to WAV Shared File | Access Your Shared Audio',
+  description: 'Access a shared WAV audio file that was converted from MP3. Download high-quality audio files shared by our online converter tool.',
   alternates: {
-    canonical: '/download',
+    canonical: '/share',
   }
 }
 
-export default function DownloadLayout({
+export default function ShareLayout({
   children,
 }: {
   children: React.ReactNode
