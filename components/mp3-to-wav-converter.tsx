@@ -1630,8 +1630,10 @@ export function MP3toWAVConverter() {
                       <ChevronDown className="h-5 w-5 shrink-0 transition-transform duration-200 ui-open:rotate-180" />
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="p-4 pt-0 border-t" itemScope itemProp="acceptedAnswer" itemType="https://schema.org/Answer">
-                    <p className="text-gray-700 dark:text-gray-300" itemProp="text">{item.answer}</p>
+                  <CollapsibleContent className="p-4 pt-0 border-t">
+                    <div itemScope itemProp="acceptedAnswer" itemType="https://schema.org/Answer">
+                      <p className="text-gray-700 dark:text-gray-300" itemProp="text">{item.answer}</p>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </div>
