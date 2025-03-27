@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { 
@@ -23,8 +23,40 @@ import { SiteHeader } from '@/components/site-header'
 
 export default function SharePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [shareUrl, setShareUrl] = useState('')
   const [isValidUrl, setIsValidUrl] = useState(false)
+  const shareInputRef = useRef<HTMLInputElement>(null)
+  const shareSectionRef = useRef<HTMLDivElement>(null)
+  
+  // 从URL参数加载分享链接
+  useEffect(() => {
+    const urlParam = searchParams.get('url')
+    if (urlParam) {
+      setShareUrl(urlParam)
+      const isValid = validateShareUrl(urlParam)
+      
+      if (isValid) {
+        // 延迟一下以确保DOM已完全加载
+        setTimeout(() => {
+          // 滚动到分享表单区域
+          if (shareSectionRef.current) {
+            shareSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+          
+          // 聚焦到输入框
+          if (shareInputRef.current) {
+            shareInputRef.current.focus()
+          }
+        }, 500)
+        
+        toast({
+          title: "Share link detected",
+          description: "We've automatically filled in the share link for you."
+        })
+      }
+    }
+  }, [searchParams])
   
   // 验证用户输入的URL是否是有效的分享链接
   const validateShareUrl = (url: string) => {
@@ -110,7 +142,7 @@ export default function SharePage() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            <Card>
+            <Card ref={shareSectionRef}>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Download className="h-5 w-5 mr-2 text-blue-500" />
@@ -123,6 +155,7 @@ export default function SharePage() {
               <CardContent className="space-y-4">
                 <div className="flex gap-2">
                   <Input 
+                    ref={shareInputRef}
                     placeholder="https://mp3towav.net/share/abc123" 
                     value={shareUrl}
                     onChange={handleShareUrlChange}

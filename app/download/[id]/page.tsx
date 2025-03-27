@@ -102,22 +102,29 @@ export default function DownloadPage() {
         url: shareUrl
       }).catch(err => {
         console.error('Share failed:', err)
-        // Fallback to copy to clipboard
-        copyToClipboard(shareUrl)
+        // Fallback to copy to clipboard and redirect
+        copyToClipboardAndRedirect(shareUrl)
       })
     } else {
-      // Fallback to copy to clipboard
-      copyToClipboard(shareUrl)
+      // Fallback to copy to clipboard and redirect
+      copyToClipboardAndRedirect(shareUrl)
     }
   }
   
-  // Copy to clipboard helper
-  const copyToClipboard = (text: string) => {
+  // Copy to clipboard helper and redirect to share page
+  const copyToClipboardAndRedirect = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       toast({
         title: "Share link copied",
-        description: "Share link has been copied to your clipboard."
+        description: "Share link has been copied to your clipboard. Redirecting to share page..."
       })
+      
+      // 使用setTimeout确保toast消息能够显示
+      setTimeout(() => {
+        // 创建一个包含分享链接的URL参数
+        const redirectUrl = `/share?url=${encodeURIComponent(text)}`
+        router.push(redirectUrl)
+      }, 1000)
     }).catch(err => {
       console.error('Copy failed:', err)
       toast({
