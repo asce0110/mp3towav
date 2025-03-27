@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -21,7 +21,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from '@/components/ui/use-toast'
 import { SiteHeader } from '@/components/site-header'
 
-export default function SharePage() {
+// 创建一个包裹了useSearchParams的组件
+function ShareContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [shareUrl, setShareUrl] = useState('')
@@ -133,7 +134,6 @@ export default function SharePage() {
   
   return (
     <>
-      <SiteHeader />
       <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col items-center">
         <div className="container max-w-5xl mx-auto px-4 py-12">
           <h1 className="text-3xl md:text-4xl font-bold text-center mb-6">Share Your Converted Audio</h1>
@@ -248,42 +248,58 @@ export default function SharePage() {
           </div>
           
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-bold mb-4 flex items-center">
-              <FileAudio className="h-5 w-5 mr-2 text-blue-500" />
-              How File Sharing Works
-            </h2>
+            <h2 className="text-xl font-bold mb-4">How Sharing Works</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                  <span className="text-xl font-bold text-blue-600 dark:text-blue-300">1</span>
+              <div className="flex flex-col items-center text-center">
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full mb-3">
+                  <FileAudio className="h-8 w-8 text-blue-500 dark:text-blue-300" />
                 </div>
                 <h3 className="font-medium mb-2">Convert Your MP3</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Upload and convert your MP3 file to WAV format using our converter
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Use our converter to transform your MP3 file to WAV format
                 </p>
               </div>
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                  <span className="text-xl font-bold text-blue-600 dark:text-blue-300">2</span>
+              <div className="flex flex-col items-center text-center">
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full mb-3">
+                  <Share2 className="h-8 w-8 text-blue-500 dark:text-blue-300" />
                 </div>
-                <h3 className="font-medium mb-2">Generate Share Link</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  After conversion, click the "Share" button to generate a unique share link
+                <h3 className="font-medium mb-2">Get Share Link</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  After conversion, click "Share" to generate a unique share link
                 </p>
               </div>
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-3">
-                  <span className="text-xl font-bold text-blue-600 dark:text-blue-300">3</span>
+              <div className="flex flex-col items-center text-center">
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full mb-3">
+                  <Download className="h-8 w-8 text-blue-500 dark:text-blue-300" />
                 </div>
                 <h3 className="font-medium mb-2">Share & Access</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Share the link with others or use it to access your converted file on any device
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Share the link with others or use it yourself to access the WAV file for 24 hours
                 </p>
               </div>
             </div>
           </div>
         </div>
       </main>
+    </>
+  )
+}
+
+// 主页面组件，使用Suspense包装
+export default function SharePage() {
+  return (
+    <>
+      <SiteHeader />
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Loading Share Page...</h2>
+            <p className="text-gray-500">Please wait while we prepare the sharing tools</p>
+          </div>
+        </div>
+      }>
+        <ShareContent />
+      </Suspense>
     </>
   )
 } 
