@@ -1622,18 +1622,25 @@ export function MP3toWAVConverter() {
                 answer: "Currently, our tool processes one file at a time for optimal quality and performance. For converting multiple MP3 files to WAV, we recommend converting them sequentially. Simply upload each file, convert it, download the WAV, and then proceed with the next file. Each conversion retains your settings, making the process more efficient with each subsequent file."
               }
             ].map((item, index) => (
-              <div key={index} className="border rounded-lg overflow-hidden" itemScope itemProp="mainEntity" itemType="https://schema.org/Question">
+              <div key={index} className="border rounded-lg overflow-hidden">
+                {/* Hidden structured data for SEO */}
+                <div itemProp="mainEntity" itemScope itemType="https://schema.org/Question">
+                  <meta itemProp="name" content={item.question} />
+                  <div itemProp="acceptedAnswer" itemScope itemType="https://schema.org/Answer">
+                    <meta itemProp="text" content={item.answer} />
+                  </div>
+                </div>
+
+                {/* Visible FAQ UI */}
                 <Collapsible>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" className="flex w-full justify-between p-4 text-left">
-                      <span className="font-medium" itemProp="name">{item.question}</span>
+                      <span className="font-medium">{item.question}</span>
                       <ChevronDown className="h-5 w-5 shrink-0 transition-transform duration-200 ui-open:rotate-180" />
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="p-4 pt-0 border-t">
-                    <div itemScope itemProp="acceptedAnswer" itemType="https://schema.org/Answer">
-                      <p className="text-gray-700 dark:text-gray-300" itemProp="text">{item.answer}</p>
-                    </div>
+                    <p className="text-gray-700 dark:text-gray-300">{item.answer}</p>
                   </CollapsibleContent>
                 </Collapsible>
               </div>
