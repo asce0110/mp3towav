@@ -226,7 +226,7 @@ export default function DownloadPage() {
     };
   }, [audioRef.current, duration]); // 依赖数组
   
-  // 添加额外的定时器来更新进度条
+  // 修改添加额外的定时器来更新进度条
   useEffect(() => {
     // 如果正在播放，使用定时器更新进度条
     let progressInterval: NodeJS.Timeout | null = null;
@@ -234,19 +234,33 @@ export default function DownloadPage() {
     if (isPlaying && audioRef.current) {
       progressInterval = setInterval(() => {
         if (audioRef.current) {
-          const currentTimeValue = audioRef.current.currentTime;
-          
-          // 检测是否到达音频结尾
-          if (currentTimeValue >= audioRef.current.duration) {
-            setIsPlaying(false);
-            setCurrentTime(0);
-            audioRef.current.currentTime = 0;
-            console.log("播放结束，重置播放器");
-          } else {
-            setCurrentTime(currentTimeValue);
+          try {
+            const currentTimeValue = audioRef.current.currentTime;
+            
+            // 检测是否到达音频结尾
+            if (currentTimeValue >= (audioRef.current.duration - 0.5)) {
+              setIsPlaying(false);
+              setCurrentTime(0);
+              audioRef.current.currentTime = 0;
+              console.log("播放结束，重置播放器");
+            } else {
+              setCurrentTime(currentTimeValue);
+              
+              // 监测是否已卡住（当前时间没有变化）
+              if (Math.abs(currentTime - currentTimeValue) < 0.01 && currentTimeValue > 0) {
+                console.log("检测到播放可能卡住，尝试恢复");
+                // 尝试轻微调整时间以恢复播放
+                const newTime = currentTimeValue + 0.1;
+                if (newTime < audioRef.current.duration) {
+                  audioRef.current.currentTime = newTime;
+                }
+              }
+            }
+          } catch (error) {
+            console.error("更新进度条时出错:", error);
           }
         }
-      }, 100); // 更频繁地更新，每100毫秒一次
+      }, 250); // 更频繁地更新，每250毫秒一次
       
       console.log("启动进度更新定时器");
     }
@@ -257,7 +271,7 @@ export default function DownloadPage() {
         console.log("停止进度更新定时器");
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, currentTime]);
   
   // 初始化播放器 - 在组件挂载时预先准备播放器
   useEffect(() => {
@@ -277,31 +291,64 @@ export default function DownloadPage() {
     }
   }, [downloadUrl, audioContext]);
   
-  // Toggle playback
+  // 增强版播放切换函数
   const togglePlayback = () => {
-    if (!audioRef.current || !isAudioReady) return
+    if (!audioRef.current || !isAudioReady) return;
     
-    if (isPlaying) {
-      audioRef.current.pause()
-    } else {
-      // 使用Promise处理播放可能的错误
-      const playPromise = audioRef.current.play()
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("播放开始")
-          })
-          .catch(error => {
-            console.error("播放失败:", error)
-            toast({
-              title: "Playback error",
-              description: "Could not play audio. Please try again.",
-              variant: "destructive",
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        // 检查是否已播放结束
+        if (audioRef.current.currentTime >= (audioRef.current.duration - 0.1)) {
+          audioRef.current.currentTime = 0;
+        }
+        
+        // 确保音量正确设置
+        audioRef.current.volume = volume / 100;
+        
+        // 使用Promise处理播放可能的错误
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log("播放开始");
+              setIsPlaying(true);
             })
-          })
+            .catch(error => {
+              console.error("播放失败:", error);
+              
+              // 尝试恢复播放
+              setTimeout(() => {
+                if (audioRef.current) {
+                  audioRef.current.play()
+                    .then(() => {
+                      console.log("第二次尝试播放成功");
+                      setIsPlaying(true);
+                    })
+                    .catch(secondError => {
+                      console.error("第二次播放尝试也失败:", secondError);
+                      toast({
+                        title: "Playback error",
+                        description: "Could not play audio. Please try again.",
+                        variant: "destructive",
+                      });
+                    });
+                }
+              }, 300);
+            });
+        }
       }
+    } catch (error) {
+      console.error("播放控制错误:", error);
+      toast({
+        title: "Playback error",
+        description: "Could not control audio playback. Please try again.",
+        variant: "destructive",
+      });
     }
-  }
+  };
   
   // Handle volume change
   const handleVolumeChange = (value: number[]) => {
@@ -313,7 +360,7 @@ export default function DownloadPage() {
     }
   }
   
-  // 修改seek处理方法，确保更好的用户体验
+  // 修改处理seek的函数以更好地处理完整播放
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!audioRef.current) return;
     
@@ -324,10 +371,22 @@ export default function DownloadPage() {
         audioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
         
-        // 如果是在拖动进度条时暂停播放状态，记录下来以便恢复
-        if (!isPlaying && newTime > 0 && newTime < (audioRef.current.duration || 0)) {
-          // 可以考虑在松开进度条时自动恢复播放
-          console.log("进度条拖动到新位置:", newTime);
+        // 如果已播放到结尾附近且尝试拖动到其他位置，检查是否需要恢复播放
+        const wasNearEnd = isPlaying === false && 
+                          currentTime > 0 && 
+                          audioRef.current.duration > 0 && 
+                          (currentTime >= audioRef.current.duration - 1);
+        
+        if (wasNearEnd && newTime < audioRef.current.duration - 1) {
+          console.log("从接近结尾处拖动回来，尝试恢复播放");
+          // 尝试自动恢复播放
+          setTimeout(() => {
+            if (audioRef.current && !isPlaying) {
+              audioRef.current.play()
+                .then(() => setIsPlaying(true))
+                .catch(err => console.error("恢复播放失败:", err));
+            }
+          }, 100);
         }
       }
     } catch (error) {
