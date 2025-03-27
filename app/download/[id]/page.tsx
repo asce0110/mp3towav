@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Home, Download, Play, Pause, Volume2 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { Slider } from "@/components/ui/slider"
-import Head from "next/head"
 import { SiteHeader } from "@/components/site-header"
 
 export default function DownloadPage() {
@@ -278,125 +277,39 @@ export default function DownloadPage() {
     }
   }, [downloadUrl, audioContext]);
   
-  // Handle playing and pausing audio
-  const togglePlayback = async () => {
-    if (!audioRef.current) return;
+  // Toggle playback
+  const togglePlayback = () => {
+    if (!audioRef.current || !isAudioReady) return
     
-    try {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-        console.log("暂停播放");
-      } else {
-        try {
-          // 确保音频元素已经正确初始化
-          if (downloadUrl && (!audioRef.current.src || audioRef.current.src !== downloadUrl)) {
-            console.log("更新音频源:", downloadUrl);
-            audioRef.current.src = downloadUrl;
-            audioRef.current.load();
-            await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟确保加载
-          }
-          
-          // 初始化音频上下文（如果需要）
-          if (!gainNode && audioContext) {
-            try {
-              console.log("正在初始化音频处理节点");
-              const gain = audioContext.createGain();
-              const source = audioContext.createMediaElementSource(audioRef.current);
-              
-              source.connect(gain);
-              gain.connect(audioContext.destination);
-              
-              setGainNode(gain);
-              
-              // 设置初始音量
-              gain.gain.value = volume / 100;
-              console.log("已创建音频增益节点");
-              
-              // 短暂延迟确保连接完成
-              await new Promise(resolve => setTimeout(resolve, 50));
-            } catch (audioCtxError) {
-              console.error("Error connecting audio nodes:", audioCtxError);
-              // 失败后回退到原生控制
-            }
-          }
-          
-          // 标记音频为已准备好状态（无论如何都尝试播放）
-          setIsAudioReady(true);
-          
-          // 强制设置音量
-          if (gainNode) {
-            gainNode.gain.value = volume / 100;
-          } else if (audioRef.current) {
-            audioRef.current.volume = Math.min(1.0, volume / 100);
-          }
-          
-          // 尝试播放
-          console.log("尝试播放音频");
-          
-          // 使用一个额外的包装方法来处理播放
-          const startPlayback = async () => {
-            if (!audioRef.current) return false;
-            
-            try {
-              // 直接使用await等待播放开始
-              await audioRef.current.play();
-              console.log("播放开始成功");
-              return true;
-            } catch (error) {
-              console.error("播放失败:", error);
-              return false;
-            }
-          };
-          
-          const playSuccess = await startPlayback();
-          
-          if (playSuccess) {
-            setIsPlaying(true);
-            
-            // 确保时长已设置
-            if (duration === 0 && audioRef.current && isFinite(audioRef.current.duration)) {
-              console.log("设置音频时长:", audioRef.current.duration);
-              setDuration(audioRef.current.duration);
-            }
-          } else {
-            // 播放失败，提示用户
+    if (isPlaying) {
+      audioRef.current.pause()
+    } else {
+      // 使用Promise处理播放可能的错误
+      const playPromise = audioRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log("播放开始")
+          })
+          .catch(error => {
+            console.error("播放失败:", error)
             toast({
-              title: "播放失败",
-              description: "请再次点击播放按钮，或检查您的文件是否有效。",
+              title: "Playback error",
+              description: "Could not play audio. Please try again.",
               variant: "destructive",
-            });
-          }
-        } catch (playError) {
-          console.error("播放错误:", playError);
-          
-          // 用户交互问题（常见于移动设备）
-          toast({
-            title: "播放失败",
-            description: "请再次点击播放按钮，或检查您的文件是否有效。",
-            variant: "destructive",
-          });
-        }
+            })
+          })
       }
-    } catch (error) {
-      console.error("播放控制错误:", error);
-      toast({
-        title: "播放错误",
-        description: "控制音频播放时出现错误。",
-        variant: "destructive",
-      });
     }
-  };
+  }
   
   // Handle volume change
-  const handleVolumeChange = (newVolume: number[]) => {
-    const volumeValue = newVolume[0]
-    setVolume(volumeValue)
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0]
+    setVolume(newVolume)
     
-    if (gainNode) {
-      gainNode.gain.value = volumeValue / 100
-    } else if (audioRef.current) {
-      audioRef.current.volume = Math.min(1.0, volumeValue / 100)
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100
     }
   }
   
@@ -469,141 +382,133 @@ export default function DownloadPage() {
   return (
     <>
       <SiteHeader />
-      <Head>
-        <title>MP3 to WAV Download | Get Your Converted Audio File</title>
-        <meta name="description" content="Download your MP3 to WAV converted file. Preview before downloading, adjust playback volume, and share high-quality WAV files. Fast and reliable conversion." />
-      </Head>
-      
-      <div className="container max-w-4xl mx-auto px-4 py-12">
-        <Card className="w-full max-w-2xl bg-white shadow-lg">
-          <CardHeader className="bg-[#2A6FDB] text-white">
-            <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
-              <Volume2 className="h-6 w-6" />
-              Download Your Converted WAV File
-            </CardTitle>
-          </CardHeader>
-          
-          <CardContent className="p-6">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center p-12">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <h2 className="text-xl font-semibold">Loading your file...</h2>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                <div className="flex flex-col items-center">
-                  <h2 className="text-xl font-medium mb-2">{fileName.replace(/\.mp3$/i, '.wav')}</h2>
-                  <p className="text-gray-500 text-sm mb-6">Your MP3 has been successfully converted to WAV</p>
+      <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="container max-w-4xl mx-auto px-4 py-12">
+          <Card className="w-full max-w-2xl mx-auto bg-white shadow-lg">
+            <CardHeader className="bg-[#2A6FDB] text-white">
+              <CardTitle className="text-2xl font-bold text-center">
+                Download Your WAV File
+              </CardTitle>
+            </CardHeader>
+            
+            <CardContent className="p-6">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center p-12">
+                  <Loader2 className="h-12 w-12 animate-spin text-[#2A6FDB] mb-4" />
+                  <h2 className="text-xl font-semibold">Loading your file...</h2>
                 </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-4">Listen to Your Converted File</h3>
+              ) : (
+                <div className="space-y-8">
+                  <div className="flex flex-col items-center">
+                    <h2 className="text-xl font-medium mb-2">{fileName.replace(/\.mp3$/i, '.wav')}</h2>
+                    <p className="text-gray-500 text-sm mb-6">Your MP3 has been successfully converted to WAV</p>
+                  </div>
                   
-                  <audio 
-                    ref={audioRef} 
-                    className="hidden" 
-                    preload="auto"
-                    controlsList="nodownload nofullscreen noremoteplayback"
-                  />
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-4">
-                      <Button 
-                        className={`h-12 w-12 rounded-full flex items-center justify-center ${!isAudioReady ? 'opacity-70' : ''}`}
-                        onClick={togglePlayback}
-                        disabled={isLoading}
-                      >
-                        {isPlaying ? (
-                          <Pause className="h-6 w-6" />
-                        ) : (
-                          !isAudioReady ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-6 w-6" />
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-medium mb-4">Listen to Your Converted File</h3>
+                    
+                    <audio 
+                      ref={audioRef} 
+                      className="hidden" 
+                      preload="auto"
+                      controlsList="nodownload nofullscreen noremoteplayback"
+                    />
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-4">
+                        <Button 
+                          className={`h-12 w-12 rounded-full flex items-center justify-center ${!isAudioReady ? 'opacity-70' : ''}`}
+                          onClick={togglePlayback}
+                          disabled={isLoading}
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-6 w-6" />
+                          ) : (
+                            !isAudioReady ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-6 w-6" />
+                          )}
+                        </Button>
+                        
+                        {!isAudioReady && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setIsAudioReady(true)}
+                          >
+                            Force Enable Player
+                          </Button>
                         )}
-                      </Button>
+                      </div>
                       
                       {!isAudioReady && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setIsAudioReady(true)}
-                        >
-                          Force Enable Player
-                        </Button>
+                        <p className="text-xs text-center text-gray-500">
+                          Preparing audio playback... If it takes too long, click "Force Enable Player".
+                        </p>
                       )}
-                    </div>
-                    
-                    {!isAudioReady && (
-                      <p className="text-xs text-center text-gray-500">
-                        Preparing audio playback... If it takes too long, click "Force Enable Player".
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500 w-12 text-right">
-                        {formatTime(currentTime)}
-                      </span>
-                      <div 
-                        className="relative w-full h-2 bg-gray-200 rounded-lg cursor-pointer"
-                        onClick={handleClickTrack}
-                      >
-                        {/* 进度条已播放部分 */}
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 w-12 text-right">
+                          {formatTime(currentTime)}
+                        </span>
                         <div 
-                          className="absolute top-0 left-0 h-full bg-[#2A6FDB] rounded-lg" 
-                          style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                        />
-                        <input
-                          type="range"
-                          min="0"
-                          max={duration || 100}
-                          value={currentTime}
-                          onChange={handleSeek}
-                          className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+                          className="relative w-full h-2 bg-gray-200 rounded-lg cursor-pointer"
+                          onClick={handleClickTrack}
+                        >
+                          {/* 进度条已播放部分 */}
+                          <div 
+                            className="absolute top-0 left-0 h-full bg-[#2A6FDB] rounded-lg" 
+                            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                          />
+                          <input
+                            type="range"
+                            min="0"
+                            max={duration || 100}
+                            value={currentTime}
+                            onChange={handleSeek}
+                            className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <span className="text-sm text-gray-500 w-12">
+                          {formatTime(duration)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Volume2 className="h-4 w-4 text-gray-500" />
+                        <Slider
+                          min={0}
+                          max={200}
+                          step={1}
+                          value={[volume]}
+                          onValueChange={handleVolumeChange}
                         />
                       </div>
-                      <span className="text-sm text-gray-500 w-12">
-                        {formatTime(duration)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="h-4 w-4 text-gray-500" />
-                      <Slider
-                        min={0}
-                        max={200}
-                        step={1}
-                        value={[volume]}
-                        onValueChange={handleVolumeChange}
-                      />
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex flex-col md:flex-row gap-4 justify-center">
-                  <Button 
-                    className="flex-1 bg-[#2A6FDB] hover:bg-[#2A6FDB]/90"
-                    onClick={handleDownload}
-                  >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download WAV File
-                  </Button>
                   
-                  <Button 
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => router.push('/')}
-                  >
-                    <Home className="h-5 w-5 mr-2" />
-                    Return to Converter
-                  </Button>
+                  <div className="flex flex-col md:flex-row gap-4 justify-center">
+                    <Button 
+                      className="flex-1 bg-[#2A6FDB] hover:bg-[#2A6FDB]/90"
+                      onClick={handleDownload}
+                    >
+                      <Download className="h-5 w-5 mr-2" />
+                      Download WAV File
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => router.push('/')}
+                    >
+                      <Home className="h-5 w-5 mr-2" />
+                      Return to Converter
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <p className="mt-6 text-sm text-gray-500">
-          Want to convert another file? <a href="/" className="text-[#2A6FDB] hover:underline">Return to the MP3 to WAV Converter</a>
-        </p>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </>
   )
 } 
