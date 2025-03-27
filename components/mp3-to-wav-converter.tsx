@@ -1020,8 +1020,9 @@ export function MP3toWAVConverter() {
         throw new Error(data.error || 'Unknown error creating share link');
       }
       
-      // 跳转到分享页面
-      window.location.href = `/share?url=${encodeURIComponent(data.shareUrl)}`;
+      // 直接跳转到分享页面 - 修复跳转URL格式
+      const sharePageUrl = `/share/${data.shareId}`;
+      window.location.href = sharePageUrl;
       
     } catch (error) {
       console.error('Share error:', error);
