@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Home, Download, Play, Pause, Volume2 } from "lucide-react"
+import { Loader2, Home, Download, Play, Pause, Volume2, AlertTriangle } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { Slider } from "@/components/ui/slider"
 import { SiteHeader } from "@/components/site-header"
@@ -16,7 +16,8 @@ export default function DownloadPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [fileName, setFileName] = useState("")
   const [downloadUrl, setDownloadUrl] = useState("")
-  const [showNativeControls, setShowNativeControls] = useState(false)
+  const [audioError, setAudioError] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   // Fetch download data on page load
   useEffect(() => {
@@ -56,14 +57,35 @@ export default function DownloadPage() {
     fetchDownloadData()
   }, [params.id, router])
   
-  // Handle switching to native controls
-  const handleSwitchToNativeControls = () => {
-    setShowNativeControls(true)
-    toast({
-      title: "Native audio player enabled",
-      description: "Using browser's built-in audio player for better compatibility."
-    })
-  }
+  // Handle audio element errors
+  useEffect(() => {
+    if (!audioRef.current) return
+    
+    const handleError = (e: Event) => {
+      console.error("Audio playback error:", e)
+      setAudioError(true)
+      toast({
+        title: "Audio playback issue",
+        description: "There was a problem playing this audio. Try downloading the file instead.",
+        variant: "destructive",
+      })
+    }
+    
+    const handleCanPlay = () => {
+      console.log("Audio can play")
+      setAudioError(false)
+    }
+    
+    audioRef.current.addEventListener('error', handleError)
+    audioRef.current.addEventListener('canplay', handleCanPlay)
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('error', handleError)
+        audioRef.current.removeEventListener('canplay', handleCanPlay)
+      }
+    }
+  }, [downloadUrl])
   
   // Format time in MM:SS
   const formatTime = (time: number) => {
@@ -88,6 +110,28 @@ export default function DownloadPage() {
       title: "Download started",
       description: "Your WAV file is being downloaded.",
     })
+  }
+  
+  // Attempt to refresh audio playback
+  const handleRefreshAudio = () => {
+    if (!audioRef.current || !downloadUrl) return
+    
+    // Reset error state
+    setAudioError(false)
+    
+    // Force reload the audio element
+    const currentTime = audioRef.current.currentTime
+    audioRef.current.load()
+    
+    // Set the current time back to where it was
+    audioRef.current.oncanplay = () => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = currentTime
+        audioRef.current.play().catch(err => {
+          console.error("Failed to restart playback:", err)
+        })
+      }
+    }
   }
   
   return (
@@ -118,39 +162,40 @@ export default function DownloadPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-medium mb-4">Listen to Your Converted File</h3>
                     
-                    {showNativeControls ? (
-                      <div className="w-full flex flex-col items-center">
-                        <audio 
-                          src={downloadUrl}
-                          controls
-                          controlsList="nodownload"
-                          className="w-full max-w-md my-4"
-                          preload="auto"
-                        />
-                        <p className="text-xs text-gray-500 mt-2">
-                          Using browser's native audio player for better compatibility
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="w-full flex flex-col items-center">
-                        <audio 
-                          src={downloadUrl}
-                          controlsList="nodownload"
-                          className="hidden"
-                        />
-                        <Button 
-                          variant="default" 
-                          className="bg-[#2A6FDB] mb-4" 
-                          onClick={handleSwitchToNativeControls}
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Play Audio
-                        </Button>
-                        <p className="text-xs text-gray-500 text-center">
-                          If you experience playback issues, click the button above to use browser's built-in player
-                        </p>
-                      </div>
-                    )}
+                    <div className="w-full flex flex-col items-center">
+                      <audio 
+                        ref={audioRef}
+                        src={downloadUrl}
+                        controls
+                        controlsList="nodownload"
+                        className="w-full max-w-md my-4"
+                        preload="auto"
+                      />
+                      
+                      {audioError && (
+                        <div className="flex flex-col items-center my-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                          <div className="flex items-center gap-2 text-amber-600 mb-2">
+                            <AlertTriangle className="h-5 w-5" />
+                            <span className="font-medium">Playback Issue Detected</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-3">
+                            The audio player is having trouble with this file. You can try these options:
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            <Button variant="outline" size="sm" onClick={handleRefreshAudio}>
+                              <Play className="h-4 w-4 mr-1" /> Retry Playback
+                            </Button>
+                            <Button variant="default" size="sm" onClick={handleDownload}>
+                              <Download className="h-4 w-4 mr-1" /> Download Instead
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        For the best experience, we recommend downloading the file to your device.
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="flex flex-col md:flex-row gap-4 justify-center">
