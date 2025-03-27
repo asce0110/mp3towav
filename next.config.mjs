@@ -38,6 +38,8 @@ const nextConfig = {
       },
     ];
   },
+  // 不再需要重写sitemap.xml，因为我们有了直接的路由
+  /* 注释掉旧的重写规则
   async rewrites() {
     return [
       {
@@ -46,6 +48,7 @@ const nextConfig = {
       },
     ];
   },
+  */
   serverRuntimeConfig: {
     maxBodySize: '500mb', // 设置最大上传大小为 500MB
   },
