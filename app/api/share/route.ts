@@ -3,16 +3,85 @@ import fs from 'fs';
 import path from 'path';
 import { isR2Configured, fileExistsInR2, generatePresignedUrl } from '@/lib/r2';
 
-// 模拟数据库存储分享信息
-const shares = new Map<string, {
-  fileId: string,
-  originalName: string,
-  createdAt: number,
-  expiresAt: number
-}>();
+// 定义共享文件的数据结构
+interface ShareInfo {
+  fileId: string;
+  originalName: string;
+  createdAt: number;
+  expiresAt: number;
+}
 
-// 临时文件存储目录
+// 使用内存存储作为缓存，加快访问速度
+const sharesCache = new Map<string, ShareInfo>();
+
+// 临时文件和分享信息存储目录
 const TMP_DIR = path.join(process.cwd(), 'tmp');
+const SHARES_DIR = path.join(TMP_DIR, 'shares');
+
+// 确保目录存在
+function ensureDirectoriesExist() {
+  if (!fs.existsSync(TMP_DIR)) {
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(SHARES_DIR)) {
+    fs.mkdirSync(SHARES_DIR, { recursive: true });
+  }
+}
+
+// 从文件系统加载分享信息
+function loadShareInfo(shareId: string): ShareInfo | null {
+  try {
+    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
+    if (!fs.existsSync(sharePath)) {
+      return null;
+    }
+    
+    const shareData = fs.readFileSync(sharePath, 'utf-8');
+    const shareInfo = JSON.parse(shareData) as ShareInfo;
+    
+    // 缓存到内存
+    sharesCache.set(shareId, shareInfo);
+    
+    return shareInfo;
+  } catch (error) {
+    console.error(`Error loading share info for ${shareId}:`, error);
+    return null;
+  }
+}
+
+// 保存分享信息到文件系统
+function saveShareInfo(shareId: string, shareInfo: ShareInfo) {
+  try {
+    ensureDirectoriesExist();
+    
+    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
+    fs.writeFileSync(sharePath, JSON.stringify(shareInfo), 'utf-8');
+    
+    // 缓存到内存
+    sharesCache.set(shareId, shareInfo);
+    
+    // 设置到期自动删除
+    setTimeout(() => {
+      removeShareInfo(shareId);
+    }, shareInfo.expiresAt - Date.now());
+  } catch (error) {
+    console.error(`Error saving share info for ${shareId}:`, error);
+  }
+}
+
+// 从文件系统和内存缓存中删除分享信息
+function removeShareInfo(shareId: string) {
+  try {
+    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
+    if (fs.existsSync(sharePath)) {
+      fs.unlinkSync(sharePath);
+    }
+    sharesCache.delete(shareId);
+    console.log(`分享链接已过期并移除: ${shareId}`);
+  } catch (error) {
+    console.error(`Error removing share info for ${shareId}:`, error);
+  }
+}
 
 // 创建分享链接
 export async function POST(request: NextRequest) {
@@ -48,19 +117,16 @@ export async function POST(request: NextRequest) {
     const now = Date.now();
     const expiresAt = now + (1000 * 60 * 60 * 24);
     
-    // 存储分享信息
-    shares.set(finalShareId, {
+    // 创建分享信息
+    const shareInfo: ShareInfo = {
       fileId,
       originalName: originalName || `${fileId}.wav`,
       createdAt: now,
       expiresAt: expiresAt
-    });
+    };
     
-    // 链接过期时间（24小时）
-    setTimeout(() => {
-      shares.delete(finalShareId);
-      console.log(`分享链接已过期并移除: ${finalShareId}`);
-    }, 1000 * 60 * 60 * 24);
+    // 存储分享信息到文件系统
+    saveShareInfo(finalShareId, shareInfo);
     
     return NextResponse.json({
       success: true,
@@ -83,16 +149,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing share ID' }, { status: 400 });
     }
     
-    const shareInfo = shares.get(shareId);
+    // 首先从内存缓存中获取
+    let shareInfo = sharesCache.get(shareId);
     
+    // 如果不在缓存中，从文件系统加载
     if (!shareInfo) {
+      shareInfo = loadShareInfo(shareId);
+    }
+    
+    // 检查是否存在
+    if (!shareInfo) {
+      console.log(`Share not found: ${shareId}`);
       return NextResponse.json({ error: 'Share not found or expired' }, { status: 404 });
     }
     
     // 检查是否过期
     if (Date.now() > shareInfo.expiresAt) {
       // 清理过期的分享
-      shares.delete(shareId);
+      removeShareInfo(shareId);
+      console.log(`Share expired: ${shareId}`);
       return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
     }
     
@@ -110,10 +185,16 @@ export async function GET(request: NextRequest) {
       const filePath = path.join(TMP_DIR, `${shareInfo.fileId}.wav`);
       if (!fs.existsSync(filePath)) {
         // 清理失效的分享
-        shares.delete(shareId);
+        removeShareInfo(shareId);
+        console.log(`File not found for share: ${shareId}, file: ${shareInfo.fileId}.wav`);
         return NextResponse.json({ error: 'File not available anymore' }, { status: 410 });
+      } else {
+        console.log(`File found for share: ${shareId}, file: ${shareInfo.fileId}.wav`);
       }
     }
+    
+    // 添加调试日志
+    console.log(`Successfully retrieved share: ${shareId}, fileId: ${shareInfo.fileId}`);
     
     return NextResponse.json({
       success: true,
