@@ -18,37 +18,27 @@ const sharesCache = new Map<string, ShareInfo>();
 const TMP_DIR = path.join(process.cwd(), 'tmp');
 const SHARES_DIR = path.join(TMP_DIR, 'shares');
 
-// 确保目录存在
+// 在应用启动时确保目录存在
 function ensureDirectoriesExist() {
   try {
+    // 确保临时目录存在
     if (!fs.existsSync(TMP_DIR)) {
-      console.log(`创建临时目录: ${TMP_DIR}`);
       fs.mkdirSync(TMP_DIR, { recursive: true });
+      console.log(`创建临时目录: ${TMP_DIR}`);
     }
     
+    // 确保分享信息目录存在
     if (!fs.existsSync(SHARES_DIR)) {
-      console.log(`创建分享目录: ${SHARES_DIR}`);
       fs.mkdirSync(SHARES_DIR, { recursive: true });
-    }
-    
-    // 验证目录权限
-    const testFile = path.join(SHARES_DIR, '.test_write_permission');
-    try {
-      // 尝试写入测试文件
-      fs.writeFileSync(testFile, 'test');
-      // 成功写入，删除测试文件
-      if (fs.existsSync(testFile)) {
-        fs.unlinkSync(testFile);
-      }
-    } catch (writeError) {
-      console.error(`目录写入权限测试失败: ${writeError}`);
-      throw new Error(`没有目录写入权限: ${SHARES_DIR}`);
+      console.log(`创建分享目录: ${SHARES_DIR}`);
     }
   } catch (error) {
-    console.error(`确保目录存在时出错:`, error);
-    throw error;
+    console.error('创建必要目录失败:', error);
   }
 }
+
+// 立即执行确保目录存在
+ensureDirectoriesExist();
 
 // 从文件系统加载分享信息
 function loadShareInfo(shareId: string): ShareInfo | null {
@@ -74,23 +64,43 @@ function loadShareInfo(shareId: string): ShareInfo | null {
 // 保存分享信息到文件系统
 function saveShareInfo(shareId: string, shareInfo: ShareInfo) {
   try {
+    // 确保目录存在
     ensureDirectoriesExist();
     
     const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
-    fs.writeFileSync(sharePath, JSON.stringify(shareInfo), 'utf-8');
+    const shareData = JSON.stringify(shareInfo);
     
-    // 缓存到内存
-    sharesCache.set(shareId, shareInfo);
+    // 尝试保存文件
+    console.log(`尝试保存分享信息到: ${sharePath}`);
+    fs.writeFileSync(sharePath, shareData, 'utf-8');
     
-    // 设置到期自动删除
-    const expiryTimeMs = shareInfo.expiresAt - Date.now();
-    if (expiryTimeMs > 0) {
-      setTimeout(() => {
-        removeShareInfo(shareId);
-      }, expiryTimeMs);
+    // 验证文件是否成功保存
+    if (fs.existsSync(sharePath)) {
+      const stats = fs.statSync(sharePath);
+      console.log(`分享信息已保存: ${sharePath}, 大小: ${stats.size} bytes`);
+      
+      // 添加到内存缓存
+      sharesCache.set(shareId, shareInfo);
+      return true;
+    } else {
+      console.error(`保存分享信息失败: 文件未创建 ${sharePath}`);
+      throw new Error('Failed to verify saved share file');
     }
   } catch (error) {
-    console.error(`Error saving share info for ${shareId}:`, error);
+    console.error(`保存分享信息到 ${shareId} 失败:`, error);
+    // 尝试使用同步API重试一次
+    try {
+      console.log(`尝试使用备用方法重新保存...`);
+      const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
+      const shareData = JSON.stringify(shareInfo);
+      fs.writeFileSync(sharePath, shareData);
+      console.log(`使用备用方法保存成功: ${sharePath}`);
+      sharesCache.set(shareId, shareInfo);
+      return true;
+    } catch (retryError) {
+      console.error(`重试保存失败:`, retryError);
+      throw error; // 抛出原始错误
+    }
   }
 }
 
