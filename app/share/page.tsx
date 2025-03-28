@@ -69,7 +69,7 @@ function ShareContent() {
       // 检查是否为合法的分享链接
       // 1. 路径应该以/share/开头，后面跟着分享ID
       // 2. 域名检查：localhost、mp3towav.net或当前域名
-      const isPathValid = parsedUrl.pathname.match(/^\/share\/[a-zA-Z0-9_-]+$/);
+      const isPathValid = parsedUrl.pathname.match(/^\/share\/[a-zA-Z0-9_-]+$/) !== null;
       const currentDomain = window.location.hostname;
       const isDomainValid = ['localhost', 'mp3towav.net', currentDomain].includes(parsedUrl.hostname) ||
                           parsedUrl.hostname.endsWith('.vercel.app');

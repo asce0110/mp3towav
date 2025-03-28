@@ -20,11 +20,33 @@ const SHARES_DIR = path.join(TMP_DIR, 'shares');
 
 // 确保目录存在
 function ensureDirectoriesExist() {
-  if (!fs.existsSync(TMP_DIR)) {
-    fs.mkdirSync(TMP_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(SHARES_DIR)) {
-    fs.mkdirSync(SHARES_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(TMP_DIR)) {
+      console.log(`创建临时目录: ${TMP_DIR}`);
+      fs.mkdirSync(TMP_DIR, { recursive: true });
+    }
+    
+    if (!fs.existsSync(SHARES_DIR)) {
+      console.log(`创建分享目录: ${SHARES_DIR}`);
+      fs.mkdirSync(SHARES_DIR, { recursive: true });
+    }
+    
+    // 验证目录权限
+    const testFile = path.join(SHARES_DIR, '.test_write_permission');
+    try {
+      // 尝试写入测试文件
+      fs.writeFileSync(testFile, 'test');
+      // 成功写入，删除测试文件
+      if (fs.existsSync(testFile)) {
+        fs.unlinkSync(testFile);
+      }
+    } catch (writeError) {
+      console.error(`目录写入权限测试失败: ${writeError}`);
+      throw new Error(`没有目录写入权限: ${SHARES_DIR}`);
+    }
+  } catch (error) {
+    console.error(`确保目录存在时出错:`, error);
+    throw error;
   }
 }
 
@@ -149,63 +171,85 @@ export async function GET(request: NextRequest) {
     const shareId = request.nextUrl.searchParams.get('id');
     
     if (!shareId) {
+      console.log('API请求缺少share ID参数');
       return NextResponse.json({ error: 'Missing share ID' }, { status: 400 });
     }
+    
+    console.log(`API: 获取分享 ID=${shareId}`);
     
     // 首先从内存缓存中获取
     let shareInfo = sharesCache.get(shareId);
     
     // 如果不在缓存中，从文件系统加载
     if (!shareInfo) {
+      console.log(`API: 分享不在内存缓存中，从文件系统加载`);
       shareInfo = loadShareInfo(shareId);
+    } else {
+      console.log(`API: 从内存缓存中找到分享`);
     }
     
     // 检查是否存在
     if (!shareInfo) {
-      console.log(`Share not found: ${shareId}`);
-      return NextResponse.json({ error: 'Share not found or expired' }, { status: 404 });
+      console.log(`API: 分享未找到: ${shareId}`);
+      return NextResponse.json({ 
+        error: 'Share not found or expired',
+        detail: 'The requested share link could not be found in our system'
+      }, { status: 404 });
     }
     
     // 检查是否过期
     if (shareInfo.expiresAt < Date.now()) {
       // 清理过期的分享
       removeShareInfo(shareId);
-      console.log(`Share expired: ${shareId}, expired at ${new Date(shareInfo.expiresAt).toISOString()}`);
+      console.log(`API: 分享已过期: ${shareId}, 过期时间: ${new Date(shareInfo.expiresAt).toISOString()}`);
       return NextResponse.json({ 
         error: 'Share link has expired', 
         expiresAt: new Date(shareInfo.expiresAt).toISOString(),
-        currentTime: new Date().toISOString()
+        currentTime: new Date().toISOString(),
+        detail: 'The share link has expired. Shares are available for 24 hours after creation.'
       }, { status: 410 });
     }
     
     // 确定下载URL
     let downloadUrl = `/api/convert?fileId=${shareInfo.fileId}`;
+    console.log(`API: 使用默认下载URL: ${downloadUrl}`);
     
     // 如果R2可用，生成预签名URL
     if (isR2Configured) {
-      const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
-      if (presignedUrl) {
-        downloadUrl = presignedUrl;
+      try {
+        console.log(`API: 尝试从R2生成预签名URL`);
+        const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
+        if (presignedUrl) {
+          downloadUrl = presignedUrl;
+          console.log(`API: 生成了R2预签名URL`);
+        } else {
+          console.log(`API: 从R2生成预签名URL失败，使用默认URL`);
+        }
+      } catch (r2Error) {
+        console.error(`API: 生成R2预签名URL错误:`, r2Error);
       }
     } else {
+      console.log(`API: R2未配置，使用本地文件存储`);
       // 如果使用本地存储，检查文件是否存在
       const filePath = path.join(TMP_DIR, `${shareInfo.fileId}.wav`);
       if (!fs.existsSync(filePath)) {
         // 清理失效的分享
         removeShareInfo(shareId);
-        console.log(`File not found for share: ${shareId}, file: ${shareInfo.fileId}.wav`);
-        return NextResponse.json({ error: 'File not available anymore' }, { status: 410 });
+        console.log(`API: 文件不存在: ${shareId}, 文件: ${shareInfo.fileId}.wav`);
+        return NextResponse.json({ 
+          error: 'File not available anymore',
+          detail: 'The file associated with this share link no longer exists on our servers'
+        }, { status: 410 });
       } else {
-        console.log(`File found for share: ${shareId}, file: ${shareInfo.fileId}.wav`);
+        console.log(`API: 找到分享文件: ${shareId}, 文件: ${shareInfo.fileId}.wav, 大小: ${fs.statSync(filePath).size} bytes`);
       }
     }
-    
-    // 添加调试日志和有效期信息
-    console.log(`Successfully retrieved share: ${shareId}, fileId: ${shareInfo.fileId}, expires at: ${new Date(shareInfo.expiresAt).toISOString()}`);
     
     // 计算剩余有效时间（以分钟为单位）
     const remainingTimeMs = shareInfo.expiresAt - Date.now();
     const remainingMinutes = Math.max(0, Math.floor(remainingTimeMs / (1000 * 60)));
+    
+    console.log(`API: 成功获取分享: ${shareId}, fileId: ${shareInfo.fileId}, 剩余时间: ${remainingMinutes}分钟`);
     
     return NextResponse.json({
       success: true,
@@ -216,9 +260,12 @@ export async function GET(request: NextRequest) {
       expiresAt: new Date(shareInfo.expiresAt).toISOString(),
       remainingMinutes: remainingMinutes
     });
-  } catch (error) {
-    console.error('Share retrieval error:', error);
-    return NextResponse.json({ error: 'Failed to retrieve share information' }, { status: 500 });
+  } catch (error: any) {
+    console.error('API: 获取分享信息错误:', error);
+    return NextResponse.json({ 
+      error: 'Failed to retrieve share information',
+      detail: error.message || 'An unknown error occurred' 
+    }, { status: 500 });
   }
 }
 
