@@ -176,7 +176,7 @@ function ShareContent() {
                 )}
               </CardContent>
               <CardFooter className="text-sm text-gray-500">
-                Shared files are available for 24 hours after creation
+                Shared files expire 24 hours after creation
               </CardFooter>
             </Card>
             

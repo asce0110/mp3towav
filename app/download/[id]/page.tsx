@@ -72,19 +72,28 @@ export default function DownloadPage() {
   const handleDownload = () => {
     if (!downloadUrl) return
     
-    const downloadLink = document.createElement('a')
-    downloadLink.href = downloadUrl
-    downloadLink.download = getFormattedFileName()
-    document.body.appendChild(downloadLink)
-    downloadLink.click()
-    document.body.removeChild(downloadLink)
-    
-    setDownloadStarted(true)
-    
-    toast({
-      title: "Download started",
-      description: "Your WAV file is being downloaded.",
-    })
+    try {
+      const downloadLink = document.createElement('a')
+      downloadLink.href = downloadUrl
+      downloadLink.download = getFormattedFileName()
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      document.body.removeChild(downloadLink)
+      
+      setDownloadStarted(true)
+      
+      toast({
+        title: "Download started",
+        description: "Your WAV file is being downloaded.",
+      })
+    } catch (error) {
+      console.error("Download error:", error)
+      toast({
+        title: "Download failed",
+        description: "Could not download the file. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
   
   // Handle sharing

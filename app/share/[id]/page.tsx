@@ -53,7 +53,8 @@ async function checkShareInFileSystem(shareId: string): Promise<any> {
       originalName: shareInfo.originalName,
       downloadUrl: `/api/convert?fileId=${shareInfo.fileId}`,
       createdAt: new Date(shareInfo.createdAt).toISOString(),
-      expiresAt: new Date(shareInfo.expiresAt).toISOString()
+      expiresAt: new Date(shareInfo.expiresAt).toISOString(),
+      remainingMinutes: Math.floor((shareInfo.expiresAt - Date.now()) / 60000)
     };
   } catch (error) {
     console.error(`Error loading share from filesystem for ${shareId}:`, error);
@@ -139,7 +140,11 @@ export default async function SharePage({ params }: { params: { id: string } }) 
                       {shareData.originalName || 'WAV File'}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      This shared file will be available for 24 hours
+                      {shareData.remainingMinutes !== undefined ? (
+                        shareData.remainingMinutes > 60 
+                          ? `This shared file will expire in ${Math.floor(shareData.remainingMinutes / 60)} hours and ${shareData.remainingMinutes % 60} minutes`
+                          : `This shared file will expire in ${shareData.remainingMinutes} minutes`
+                      ) : 'This shared file will be available for 24 hours'}
                     </p>
                   </div>
                   

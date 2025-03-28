@@ -61,9 +61,12 @@ function saveShareInfo(shareId: string, shareInfo: ShareInfo) {
     sharesCache.set(shareId, shareInfo);
     
     // 设置到期自动删除
-    setTimeout(() => {
-      removeShareInfo(shareId);
-    }, shareInfo.expiresAt - Date.now());
+    const expiryTimeMs = shareInfo.expiresAt - Date.now();
+    if (expiryTimeMs > 0) {
+      setTimeout(() => {
+        removeShareInfo(shareId);
+      }, expiryTimeMs);
+    }
   } catch (error) {
     console.error(`Error saving share info for ${shareId}:`, error);
   }
@@ -164,11 +167,15 @@ export async function GET(request: NextRequest) {
     }
     
     // 检查是否过期
-    if (Date.now() > shareInfo.expiresAt) {
+    if (shareInfo.expiresAt < Date.now()) {
       // 清理过期的分享
       removeShareInfo(shareId);
-      console.log(`Share expired: ${shareId}`);
-      return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
+      console.log(`Share expired: ${shareId}, expired at ${new Date(shareInfo.expiresAt).toISOString()}`);
+      return NextResponse.json({ 
+        error: 'Share link has expired', 
+        expiresAt: new Date(shareInfo.expiresAt).toISOString(),
+        currentTime: new Date().toISOString()
+      }, { status: 410 });
     }
     
     // 确定下载URL
@@ -193,8 +200,12 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // 添加调试日志
-    console.log(`Successfully retrieved share: ${shareId}, fileId: ${shareInfo.fileId}`);
+    // 添加调试日志和有效期信息
+    console.log(`Successfully retrieved share: ${shareId}, fileId: ${shareInfo.fileId}, expires at: ${new Date(shareInfo.expiresAt).toISOString()}`);
+    
+    // 计算剩余有效时间（以分钟为单位）
+    const remainingTimeMs = shareInfo.expiresAt - Date.now();
+    const remainingMinutes = Math.max(0, Math.floor(remainingTimeMs / (1000 * 60)));
     
     return NextResponse.json({
       success: true,
@@ -202,7 +213,8 @@ export async function GET(request: NextRequest) {
       originalName: shareInfo.originalName,
       downloadUrl: downloadUrl,
       createdAt: new Date(shareInfo.createdAt).toISOString(),
-      expiresAt: new Date(shareInfo.expiresAt).toISOString()
+      expiresAt: new Date(shareInfo.expiresAt).toISOString(),
+      remainingMinutes: remainingMinutes
     });
   } catch (error) {
     console.error('Share retrieval error:', error);

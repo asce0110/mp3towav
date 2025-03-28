@@ -992,19 +992,28 @@ export function MP3toWAVConverter() {
   const handleDownload = () => {
     if (!downloadUrl) return;
     
-    // 生成唯一ID
-    const downloadId = generateUniqueId();
-    
-    // 存储下载信息到sessionStorage
-    const downloadData = {
-      fileName: originalName || 'converted.wav',
-      url: downloadUrl
-    };
-    
-    sessionStorage.setItem(`download_${downloadId}`, JSON.stringify(downloadData));
-    
-    // 跳转到下载页面
-    window.location.href = `/download/${downloadId}`;
+    // 使用直接下载的方式而不是通过页面跳转
+    try {
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = (originalName || 'converted.wav').replace(/\.mp3$/i, '.wav');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // 显示成功提示
+      toast({
+        title: "下载已开始",
+        description: "WAV文件正在下载中，请稍候。",
+      });
+    } catch (error) {
+      console.error('下载错误:', error);
+      toast({
+        title: "下载失败",
+        description: "无法下载文件，请稍后再试。",
+        variant: "destructive",
+      });
+    }
   };
   
   // 生成唯一ID的辅助函数
