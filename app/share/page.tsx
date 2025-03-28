@@ -61,10 +61,39 @@ function ShareContent() {
   
   // 验证用户输入的URL是否是有效的分享链接
   const validateShareUrl = (url: string) => {
-    const sharePattern = /^https?:\/\/mp3towav\.net\/share\/[a-zA-Z0-9_-]+$/
-    const isValid = sharePattern.test(url)
-    setIsValidUrl(isValid)
-    return isValid
+    try {
+      // 支持多种URL格式：本地开发环境和生产环境
+      // 使用标准的URL解析而不是固定的正则表达式
+      const parsedUrl = new URL(url);
+      
+      // 检查是否为合法的分享链接
+      // 1. 路径应该以/share/开头，后面跟着分享ID
+      // 2. 域名检查：localhost、mp3towav.net或当前域名
+      const isPathValid = parsedUrl.pathname.match(/^\/share\/[a-zA-Z0-9_-]+$/);
+      const currentDomain = window.location.hostname;
+      const isDomainValid = ['localhost', 'mp3towav.net', currentDomain].includes(parsedUrl.hostname) ||
+                          parsedUrl.hostname.endsWith('.vercel.app');
+      
+      const isValid = isPathValid && isDomainValid;
+      setIsValidUrl(isValid);
+      
+      if (!isValid && url) {
+        console.log('URL格式无效:', {
+          url,
+          pathValid: !!isPathValid,
+          domainValid: isDomainValid,
+          hostname: parsedUrl.hostname,
+          pathname: parsedUrl.pathname
+        });
+      }
+      
+      return isValid;
+    } catch (error) {
+      // URL解析失败
+      console.error('URL解析失败:', error);
+      setIsValidUrl(false);
+      return false;
+    }
   }
   
   // 处理用户输入分享链接
@@ -76,14 +105,42 @@ function ShareContent() {
   
   // 打开分享链接
   const openShareLink = () => {
+    if (!shareUrl) {
+      toast({
+        title: "Empty URL",
+        description: "Please enter a share URL",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (isValidUrl) {
-      router.push(shareUrl)
+      // 记录要打开的URL
+      console.log('正在访问分享链接:', shareUrl);
+      
+      try {
+        // 提取分享ID
+        const url = new URL(shareUrl);
+        const pathParts = url.pathname.split('/');
+        const shareId = pathParts[pathParts.length - 1];
+        
+        // 直接导航到当前域名下的分享ID页面
+        const currentOrigin = window.location.origin;
+        const redirectUrl = `${currentOrigin}/share/${shareId}`;
+        
+        console.log('重定向到:', redirectUrl);
+        router.push(redirectUrl);
+      } catch (error) {
+        console.error('打开分享链接失败:', error);
+        // 回退方案：直接使用原始URL
+        router.push(shareUrl);
+      }
     } else {
       toast({
         title: "Invalid share URL",
-        description: "Please enter a valid mp3towav.net share URL",
+        description: "Please enter a valid share URL with format: https://domain.com/share/ID",
         variant: "destructive"
-      })
+      });
     }
   }
   
@@ -149,7 +206,7 @@ function ShareContent() {
                   Access Shared Files
                 </CardTitle>
                 <CardDescription>
-                  Enter a share link to access a WAV file shared with you
+                  Enter a share link or paste the full URL to access a shared WAV file
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -168,12 +225,16 @@ function ShareContent() {
                     Go
                   </Button>
                 </div>
-                {isValidUrl && (
+                {isValidUrl ? (
                   <div className="flex items-center text-green-600 text-sm">
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Valid share link
                   </div>
-                )}
+                ) : shareUrl ? (
+                  <div className="text-amber-600 text-sm">
+                    Enter a valid share URL (format: https://domain.com/share/ID)
+                  </div>
+                ) : null}
               </CardContent>
               <CardFooter className="text-sm text-gray-500">
                 Shared files expire 24 hours after creation

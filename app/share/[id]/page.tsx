@@ -76,10 +76,26 @@ async function getShareData(id: string) {
     console.log(`Fetching from API: ${apiUrl}`);
     
     // 使用服务端fetch获取分享数据
-    const response = await fetch(apiUrl, {
-      next: { revalidate: 60 }, // 缓存1分钟
-      cache: 'no-store' // 确保总是获取最新数据
-    });
+    let response;
+    try {
+      response = await fetch(apiUrl, {
+        next: { revalidate: 60 }, // 缓存1分钟
+        cache: 'no-store' // 确保总是获取最新数据
+      });
+    } catch (fetchError) {
+      console.error(`Network error when fetching from API: ${fetchError.message}`);
+      
+      // 尝试从文件系统直接获取
+      console.log('Network error occurred, trying filesystem instead');
+      const fileSystemData = await checkShareInFileSystem(id);
+      
+      if (fileSystemData) {
+        console.log('Found share data in filesystem after network error');
+        return fileSystemData;
+      }
+      
+      throw new Error(`Network error: ${fetchError.message}`);
+    }
     
     // 检查HTTP状态
     if (!response.ok) {
@@ -95,25 +111,98 @@ async function getShareData(id: string) {
       }
       
       console.error('Share data not found in API or filesystem');
+      
+      // 如果是404，则明确表示分享不存在
+      if (response.status === 404) {
+        return { 
+          success: false, 
+          error: 'not_found',
+          message: 'Share not found'
+        };
+      }
+      
+      // 如果是410，则明确表示分享已过期
+      if (response.status === 410) {
+        return { 
+          success: false, 
+          error: 'expired',
+          message: 'Share has expired'
+        };
+      }
+      
       throw new Error(`API error: ${response.status}`);
     }
     
     // 解析JSON响应
-    const data = await response.json();
-    console.log(`API response: ${JSON.stringify(data)}`);
-    return data;
+    let data;
+    try {
+      data = await response.json();
+      console.log(`API response: ${JSON.stringify(data)}`);
+      return data;
+    } catch (jsonError) {
+      console.error(`Error parsing API response: ${jsonError.message}`);
+      throw new Error('Failed to parse API response');
+    }
   } catch (error) {
     console.error('Error fetching share data:', error);
     
     // 作为备选方案，直接从文件系统获取
     console.log('Trying to get share data directly from filesystem after error');
     const fileSystemData = await checkShareInFileSystem(id);
-    return fileSystemData;
+    
+    if (fileSystemData) {
+      return fileSystemData;
+    }
+    
+    // 返回错误状态
+    return {
+      success: false,
+      error: 'unknown',
+      message: error.message || 'Unknown error occurred'
+    };
   }
 }
 
 export default async function SharePage({ params }: { params: { id: string } }) {
   console.log(`Rendering share page for ID: ${params.id}`);
+  
+  // 验证分享ID参数
+  if (!params.id || !/^[a-zA-Z0-9_-]+$/.test(params.id)) {
+    console.error(`Invalid share ID format: ${params.id}`);
+    return (
+      <>
+        <SiteHeader />
+        <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+          <div className="container mx-auto max-w-4xl px-4 py-12">
+            <Card className="w-full max-w-2xl mx-auto bg-white shadow-lg">
+              <CardHeader className="bg-red-500 text-white">
+                <CardTitle className="text-2xl font-bold text-center">
+                  Invalid Share ID
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-center space-y-6">
+                  <div className="p-4">
+                    <h3 className="text-xl font-medium mb-2 text-red-500">
+                      Invalid Share URL Format
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      The share URL you're trying to access has an invalid format.
+                    </p>
+                    <Button variant="outline" asChild>
+                      <Link href="/">
+                        Go to MP3 to WAV Converter
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </>
+    );
+  }
   
   const shareData = await getShareData(params.id);
   const isValid = shareData && shareData.success;
@@ -126,9 +215,9 @@ export default async function SharePage({ params }: { params: { id: string } }) 
       <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="container mx-auto max-w-4xl px-4 py-12">
           <Card className="w-full max-w-2xl mx-auto bg-white shadow-lg">
-            <CardHeader className="bg-[#2A6FDB] text-white">
+            <CardHeader className={isValid ? "bg-[#2A6FDB] text-white" : "bg-red-500 text-white"}>
               <CardTitle className="text-2xl font-bold text-center">
-                Shared WAV File
+                {isValid ? "Shared WAV File" : "Shared File Not Available"}
               </CardTitle>
             </CardHeader>
             
