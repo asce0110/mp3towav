@@ -117,21 +117,63 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
     }
     
+    console.log(`创建分享: fileId=${fileId}, originalName=${originalName || '未指定'}`);
+    
+    // 如果R2可用，检查连接状态
+    if (isR2Configured) {
+      try {
+        console.log('检查R2连接状态...');
+        const isConnected = await validateR2Connection();
+        if (!isConnected) {
+          console.warn('R2连接失败，将使用本地存储');
+        } else {
+          console.log('R2连接成功，将使用R2存储');
+        }
+      } catch (r2Error) {
+        console.error('R2连接测试异常:', r2Error);
+      }
+    }
+    
     // 检查文件是否存在 (首先检查R2，然后检查本地)
     let fileExists = false;
+    let storageType = '未知';
     
     if (isR2Configured) {
       // 检查文件是否存在于R2
-      fileExists = await fileExistsInR2(`wav/${fileId}.wav`);
+      console.log(`检查文件是否存在于R2: wav/${fileId}.wav`);
+      try {
+        fileExists = await fileExistsInR2(`wav/${fileId}.wav`);
+        if (fileExists) {
+          console.log(`文件存在于R2: wav/${fileId}.wav`);
+          storageType = 'R2';
+        } else {
+          console.log(`文件不存在于R2: wav/${fileId}.wav`);
+        }
+      } catch (r2Error) {
+        console.error('检查R2文件时出错:', r2Error);
+      }
     }
     
     // 如果不在R2中或R2不可用，检查本地文件系统
     if (!fileExists) {
       const filePath = path.join(TMP_DIR, `${fileId}.wav`);
-      fileExists = fs.existsSync(filePath);
+      try {
+        fileExists = fs.existsSync(filePath);
+        if (fileExists) {
+          console.log(`文件存在于本地: ${filePath}`);
+          const stats = fs.statSync(filePath);
+          console.log(`文件大小: ${stats.size}字节, 创建时间: ${stats.birthtime}`);
+          storageType = '本地';
+        } else {
+          console.log(`文件不存在于本地: ${filePath}`);
+        }
+      } catch (fsError) {
+        console.error('检查本地文件时出错:', fsError);
+      }
     }
     
     if (!fileExists) {
+      console.error(`创建分享失败: 文件不存在 fileId=${fileId}`);
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
     
@@ -150,14 +192,26 @@ export async function POST(request: NextRequest) {
       expiresAt: expiresAt
     };
     
+    console.log(`准备保存分享信息: shareId=${finalShareId}, storageType=${storageType}`);
+    
     // 存储分享信息到文件系统
-    saveShareInfo(finalShareId, shareInfo);
+    try {
+      saveShareInfo(finalShareId, shareInfo);
+      console.log(`成功保存分享信息: shareId=${finalShareId}`);
+    } catch (saveError) {
+      console.error(`保存分享信息失败: shareId=${finalShareId}`, saveError);
+      return NextResponse.json({ error: 'Failed to save share information' }, { status: 500 });
+    }
+    
+    const shareUrl = `${request.nextUrl.origin}/share/${finalShareId}`;
+    console.log(`分享创建成功: shareId=${finalShareId}, url=${shareUrl}`);
     
     return NextResponse.json({
       success: true,
       shareId: finalShareId,
-      shareUrl: `${request.nextUrl.origin}/share/${finalShareId}`,
-      expiresAt: new Date(expiresAt).toISOString()
+      shareUrl: shareUrl,
+      expiresAt: new Date(expiresAt).toISOString(),
+      storageType
     });
   } catch (error) {
     console.error('Share creation error:', error);
@@ -183,7 +237,12 @@ export async function GET(request: NextRequest) {
     // 如果不在缓存中，从文件系统加载
     if (!shareInfo) {
       console.log(`API: 分享不在内存缓存中，从文件系统加载`);
-      shareInfo = loadShareInfo(shareId);
+      const loadedShareInfo = loadShareInfo(shareId);
+      if (loadedShareInfo) {
+        shareInfo = loadedShareInfo;
+      } else {
+        console.log(`API: 文件系统中也未找到分享`);
+      }
     } else {
       console.log(`API: 从内存缓存中找到分享`);
     }

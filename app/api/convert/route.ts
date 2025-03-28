@@ -600,13 +600,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing file ID parameter' }, { status: 400 });
     }
     
+    console.log(`请求下载文件: fileId=${fileId}`);
+    
     let fileBuffer: Buffer | null = null;
     const r2Key = `wav/${fileId}.wav`;
+    let fileSource = 'unknown';
     
     // 首先尝试从R2获取文件
     if (isR2Configured) {
-      console.log(`尝试从R2获取文件: ${r2Key}`);
-      fileBuffer = await downloadFromR2(r2Key);
+      try {
+        console.log(`尝试从R2获取文件: ${r2Key}`);
+        
+        // 验证R2连接
+        const isConnected = await validateR2Connection();
+        if (!isConnected) {
+          console.warn('R2连接测试失败，将尝试从本地获取文件');
+        } else {
+          // 检查文件是否存在于R2
+          const fileExists = await fileExistsInR2(r2Key);
+          
+          if (fileExists) {
+            console.log(`文件在R2中存在: ${r2Key}`);
+            fileBuffer = await downloadFromR2(r2Key);
+            
+            if (fileBuffer) {
+              console.log(`成功从R2下载文件: ${r2Key}, 大小: ${fileBuffer.length}字节`);
+              fileSource = 'r2';
+            } else {
+              console.error(`从R2下载文件失败: ${r2Key}`);
+            }
+          } else {
+            console.log(`文件在R2中不存在: ${r2Key}`);
+          }
+        }
+      } catch (r2Error) {
+        console.error(`R2操作出错:`, r2Error);
+      }
+    } else {
+      console.log('R2未配置，将从本地获取文件');
     }
     
     // 如果R2不可用或文件不存在于R2，尝试从本地获取
@@ -615,11 +646,36 @@ export async function GET(request: NextRequest) {
       console.log(`尝试从本地获取文件: ${localPath}`);
       
       if (!fs.existsSync(localPath)) {
-        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        console.error(`文件不存在于本地: ${localPath}`);
+        return NextResponse.json({ 
+          error: 'File not found', 
+          details: 'The requested file does not exist in storage'
+        }, { status: 404 });
       }
       
-      fileBuffer = fs.readFileSync(localPath);
+      try {
+        fileBuffer = fs.readFileSync(localPath);
+        const stats = fs.statSync(localPath);
+        console.log(`成功从本地读取文件: ${localPath}, 大小: ${fileBuffer.length}字节, 创建时间: ${stats.birthtime}`);
+        fileSource = 'local';
+      } catch (fsError) {
+        console.error(`读取本地文件失败: ${localPath}`, fsError);
+        return NextResponse.json({ 
+          error: 'File read error', 
+          details: fsError instanceof Error ? fsError.message : String(fsError)
+        }, { status: 500 });
+      }
     }
+    
+    if (!fileBuffer) {
+      console.error(`无法获取文件内容: fileId=${fileId}`);
+      return NextResponse.json({ 
+        error: 'File content unavailable', 
+        details: 'Could not retrieve file content from any storage'
+      }, { status: 500 });
+    }
+    
+    console.log(`文件下载成功: fileId=${fileId}, 来源=${fileSource}, 大小=${fileBuffer.length}字节`);
     
     // 返回文件并添加CORS和缓存控制头部
     return new NextResponse(fileBuffer, {
@@ -629,12 +685,16 @@ export async function GET(request: NextRequest) {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Cache-Control': 'public, max-age=86400'
+        'Cache-Control': 'public, max-age=86400',
+        'X-File-Source': fileSource
       }
     });
   } catch (error) {
     console.error('获取文件错误:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 

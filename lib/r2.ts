@@ -25,16 +25,57 @@ if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
 export const isR2Configured = !!(R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY);
 
 // 创建 R2 客户端
-export const r2Client = isR2Configured
-  ? new S3Client({
+let r2ClientInitialized = false;
+let r2ClientInitError: any = null;
+export const r2Client = (() => {
+  if (!isR2Configured) {
+    console.log('R2 凭据未配置，将使用本地存储');
+    return null;
+  }
+  
+  try {
+    console.log(`正在初始化 R2 客户端，Account ID: ${R2_ACCOUNT_ID}, Bucket: ${R2_BUCKET_NAME}`);
+    const client = new S3Client({
       region: 'auto',
       endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: R2_ACCESS_KEY_ID!,
         secretAccessKey: R2_SECRET_ACCESS_KEY!,
       },
-    })
-  : null;
+    });
+    r2ClientInitialized = true;
+    console.log('R2 客户端初始化成功');
+    return client;
+  } catch (error) {
+    console.error('初始化 R2 客户端失败:', error);
+    r2ClientInitError = error;
+    return null;
+  }
+})();
+
+// 验证 R2 连接是否正常
+export async function validateR2Connection(): Promise<boolean> {
+  if (!isR2Configured || !r2Client) {
+    console.log('R2 未配置，无法验证连接');
+    return false;
+  }
+
+  try {
+    console.log('测试 R2 连接...');
+    // 尝试列出文件以验证连接
+    const command = new ListObjectsCommand({
+      Bucket: R2_BUCKET_NAME,
+      MaxKeys: 1, // 只获取一个对象以减少负担
+    });
+
+    await r2Client.send(command);
+    console.log('R2 连接测试成功');
+    return true;
+  } catch (error) {
+    console.error('R2 连接测试失败:', error);
+    return false;
+  }
+}
 
 /**
  * 上传文件到 R2 存储
@@ -51,10 +92,12 @@ export async function uploadToR2(
   contentType: string = 'application/octet-stream'
 ): Promise<boolean> {
   if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法上传文件');
+    console.warn('R2 未配置，无法上传文件:', key);
     return false;
   }
 
+  console.log(`开始上传文件到 R2: ${key}, 大小: ${body.length} 字节, 类型: ${contentType}`);
+  
   try {
     // 设置一天后的过期时间 (24小时)
     const expiresAt = new Date();
@@ -65,7 +108,10 @@ export async function uploadToR2(
       ...metadata,
       'created-at': new Date().toISOString(),
       'expires-at': expiresAt.toISOString(),
+      'content-length': body.length.toString(),
     };
+
+    console.log(`文件元数据: ${JSON.stringify(fileMetadata)}`);
 
     // 准备上传命令
     const command = new PutObjectCommand({
@@ -80,8 +126,17 @@ export async function uploadToR2(
     });
 
     // 执行上传
-    await r2Client.send(command);
-    console.log(`文件上传成功: ${key}`);
+    const result = await r2Client.send(command);
+    console.log(`文件上传成功: ${key}, ETag: ${result.ETag}`);
+    
+    // 验证文件是否确实存在
+    const exists = await fileExistsInR2(key);
+    if (exists) {
+      console.log(`已确认文件在 R2 中存在: ${key}`);
+    } else {
+      console.warn(`警告: 文件上传成功但验证未通过: ${key}`);
+    }
+    
     return true;
   } catch (error) {
     console.error(`上传文件到 R2 失败 (${key}):`, error);
@@ -96,11 +151,20 @@ export async function uploadToR2(
  */
 export async function downloadFromR2(key: string): Promise<Buffer | null> {
   if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法下载文件');
+    console.warn('R2 未配置，无法下载文件:', key);
     return null;
   }
 
+  console.log(`开始从 R2 下载文件: ${key}`);
+  
   try {
+    // 首先检查文件是否存在
+    const exists = await fileExistsInR2(key);
+    if (!exists) {
+      console.error(`文件在 R2 中不存在: ${key}`);
+      return null;
+    }
+    
     const command = new GetObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
@@ -112,6 +176,12 @@ export async function downloadFromR2(key: string): Promise<Buffer | null> {
       console.error(`从 R2 下载文件失败 (${key}): 响应中没有文件内容`);
       return null;
     }
+
+    console.log(`文件响应头: ${JSON.stringify({
+      ContentType: response.ContentType,
+      ContentLength: response.ContentLength,
+      Metadata: response.Metadata,
+    })}`);
 
     // 将可读流转换为 Buffer
     const chunks: Buffer[] = [];
@@ -197,11 +267,20 @@ export async function generatePresignedUrl(
   expirationSeconds: number = 86400 // 默认 24 小时
 ): Promise<string | null> {
   if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法生成预签名 URL');
+    console.warn('R2 未配置，无法生成预签名 URL:', key);
     return null;
   }
 
+  console.log(`开始为文件生成预签名 URL: ${key}, 有效期: ${expirationSeconds}秒`);
+  
   try {
+    // 先检查文件是否存在
+    const exists = await fileExistsInR2(key);
+    if (!exists) {
+      console.error(`无法生成预签名 URL，文件在 R2 中不存在: ${key}`);
+      return null;
+    }
+    
     const command = new GetObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
@@ -211,6 +290,10 @@ export async function generatePresignedUrl(
       expiresIn: expirationSeconds,
     });
 
+    console.log(`预签名 URL 生成成功: ${key}, URL长度: ${url.length}字符`);
+    // 不打印完整URL以避免泄露，只打印前30个字符
+    console.log(`预签名 URL 前缀: ${url.substring(0, 30)}...`);
+    
     return url;
   } catch (error) {
     console.error(`生成预签名 URL 失败 (${key}):`, error);
