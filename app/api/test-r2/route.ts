@@ -10,79 +10,104 @@ import {
 import fs from 'fs';
 import path from 'path';
 
+// 定义R2状态接口
+interface R2Status {
+  isConfigured: boolean;
+  clientInitialized: boolean;
+  isConnected?: boolean;
+  uploadTest?: boolean;
+  presignedUrlTest?: boolean;
+  listFilesTest?: {
+    success: boolean;
+    fileCount: number;
+    sampleFiles: string[];
+  };
+}
+
 /**
  * API端点测试R2连接状态
  */
 export async function GET(request: NextRequest) {
   try {
     // 获取R2配置状态
-    const r2Status = {
+    const r2Status: R2Status = {
       isConfigured: isR2Configured,
       clientInitialized: !!r2Client,
     };
     
-    console.log('获取R2连接状态...');
-    
-    // 如果R2配置可用，测试连接并进行高级操作
+    // 如果R2已配置，验证连接
     if (isR2Configured && r2Client) {
-      console.log('R2配置可用，测试连接...');
+      // 测试连接
+      r2Status.isConnected = await validateR2Connection();
       
-      // 测试R2连接
-      const isConnected = await validateR2Connection();
-      r2Status.isConnected = isConnected;
-      
-      if (isConnected) {
-        console.log('R2连接成功，执行更多测试...');
+      // 如果连接成功，测试文件操作
+      if (r2Status.isConnected) {
+        // 创建一个临时文件用于测试
+        const testFilePath = path.join(process.cwd(), 'tmp', 'r2-test.txt');
+        const testContent = `Test file generated at ${new Date().toISOString()}`;
         
-        // 创建一个测试文件
-        const testFileContent = Buffer.from(`R2连接测试 - ${new Date().toISOString()}`);
-        const testFileKey = `test/test-connection-${Date.now()}.txt`;
-        
-        // 上传测试文件
-        console.log(`上传测试文件: ${testFileKey}`);
-        const uploadSuccess = await uploadToR2(
-          testFileKey,
-          testFileContent,
-          { testFile: 'true' },
-          'text/plain'
-        );
-        
-        r2Status.uploadTest = uploadSuccess;
-        
-        if (uploadSuccess) {
-          console.log('测试文件上传成功');
+        try {
+          // 确保tmp目录存在
+          if (!fs.existsSync(path.join(process.cwd(), 'tmp'))) {
+            fs.mkdirSync(path.join(process.cwd(), 'tmp'), { recursive: true });
+          }
           
-          // 生成预签名URL
-          console.log('生成预签名URL');
-          const url = await generatePresignedUrl(testFileKey, 3600); // 1小时有效期
-          r2Status.presignedUrlTest = !!url;
+          // 写入测试文件
+          fs.writeFileSync(testFilePath, testContent);
+          console.log(`R2测试: 创建了测试文件 ${testFilePath}`);
           
-          // 列出文件
-          console.log('列出测试文件夹内容');
-          const files = await listFilesInR2('test/');
-          r2Status.listFilesTest = {
-            success: true,
-            fileCount: files.length,
-            sampleFiles: files.slice(0, 3)
-          };
+          // 测试上传
+          const testBuffer = fs.readFileSync(testFilePath);
+          const testKey = `test/r2-test-${Date.now()}.txt`;
+          r2Status.uploadTest = await uploadToR2(
+            testKey, 
+            testBuffer,
+            { 'source': 'test-api' },
+            'text/plain'
+          );
+          
+          // 测试预签名URL
+          if (r2Status.uploadTest) {
+            const url = await generatePresignedUrl(testKey);
+            r2Status.presignedUrlTest = !!url;
+          }
+          
+          // 列出桶中的文件
+          try {
+            const files = await listFilesInR2();
+            r2Status.listFilesTest = {
+              success: true,
+              fileCount: files.length,
+              sampleFiles: files.slice(0, 5)
+            };
+          } catch (listError) {
+            console.error('列出R2文件失败:', listError);
+            r2Status.listFilesTest = {
+              success: false,
+              fileCount: 0,
+              sampleFiles: []
+            };
+          }
+        } catch (fileError) {
+          console.error('创建测试文件失败:', fileError);
+          r2Status.uploadTest = false;
         }
-      } else {
-        console.error('R2连接测试失败');
       }
-    } else {
-      console.log('R2未配置或客户端初始化失败');
     }
     
+    // 返回状态
     return NextResponse.json({
-      success: true,
-      r2Status
+      timestamp: new Date().toISOString(),
+      status: "success",
+      r2: r2Status
     });
-  } catch (error) {
-    console.error('测试R2连接时出错:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to test R2 connection',
-      details: error instanceof Error ? error.message : String(error)
+  } catch (error: any) {
+    console.error('R2测试失败:', error);
+    return NextResponse.json({
+      timestamp: new Date().toISOString(),
+      status: "error",
+      message: error.message || "Unknown error",
+      r2: { isConfigured: isR2Configured }
     }, { status: 500 });
   }
 } 

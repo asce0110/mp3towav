@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { isR2Configured, fileExistsInR2, generatePresignedUrl } from '@/lib/r2';
+import { isR2Configured, fileExistsInR2, generatePresignedUrl, validateR2Connection } from '@/lib/r2';
 
 // 定义共享文件的数据结构
 interface ShareInfo {

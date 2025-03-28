@@ -1,0 +1,12 @@
+name = "r2-cleaner"
+main = "r2-cleaner-worker.js"
+compatibility_date = "2023-09-01"
+
+# 触发器配置 - 每6小时运行一次
+[triggers]
+crons = ["0 */6 * * *"]
+
+# R2存储桶绑定
+[[r2_buckets]]
+binding = "MP3TOWAV_BUCKET"
+bucket_name = "mp3towav" 

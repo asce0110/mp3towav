@@ -82,6 +82,46 @@ This project is [MIT](LICENSE) licensed.
 - [Node.js](https://nodejs.org/) for the runtime environment
 - All contributors who have helped this project
 
+## R2存储清理
+
+为确保R2存储不会累积过多未使用文件，项目提供了两种清理方案：
+
+### 方案1：Node.js脚本（适合本地/服务器运行）
+
+可以通过cron任务定期运行Node.js脚本清理过期文件：
+
+```bash
+# 每小时运行一次
+0 * * * * node /path/to/scripts/cleanup-r2.js >> /path/to/logs/r2-cleanup.log 2>&1
+```
+
+脚本位置：`scripts/cleanup-r2.js`
+
+### 方案2：Cloudflare Worker（推荐）
+
+使用Cloudflare Worker定时清理R2存储桶：
+
+1. 安装Wrangler CLI：
+   ```bash
+   pnpm install -g wrangler
+   ```
+
+2. 登录Cloudflare账户：
+   ```bash
+   wrangler login
+   ```
+
+3. 部署Worker：
+   ```bash
+   cd scripts
+   wrangler publish
+   ```
+
+配置文件位置：`scripts/wrangler.toml`
+Worker代码：`scripts/r2-cleaner-worker.js`
+
+此Worker会每6小时自动清理一次超过24小时的文件。
+
 ---
 
 Made with ❤️ by [Asce](https://github.com/asce0110) 

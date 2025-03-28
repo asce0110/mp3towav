@@ -9,7 +9,8 @@ import {
   uploadToR2, 
   downloadFromR2, 
   fileExistsInR2,
-  generatePresignedUrl
+  generatePresignedUrl,
+  validateR2Connection
 } from '@/lib/r2';
 
 let ffmpegAvailable = false;
