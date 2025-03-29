@@ -3,356 +3,253 @@ import {
   PutObjectCommand, 
   GetObjectCommand, 
   DeleteObjectCommand,
-  ListObjectsCommand,
-  HeadObjectCommand
+  ListObjectsV2Command
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-// R2 配置
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || '9a54200354c496d0e610009d7ab97c17';
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'mp3towav';
+// 获取环境变量
+const r2AccountId = process.env.R2_ACCOUNT_ID || '';
+const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID || '';
+const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY || '';
+const r2BucketName = process.env.R2_BUCKET_NAME || '';
+const endpoint = `https://${r2AccountId}.r2.cloudflarestorage.com`;
 
-// 如果未配置访问密钥，在控制台显示警告
-if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-  console.warn(
-    '⚠️ R2 访问密钥未配置，将使用本地存储。请设置 R2_ACCESS_KEY_ID 和 R2_SECRET_ACCESS_KEY 环境变量以启用 R2 存储。'
-  );
-}
+// 检查R2配置是否完整
+export const isR2Configured = !!(
+  r2AccountId && 
+  r2AccessKeyId && 
+  r2SecretAccessKey && 
+  r2BucketName
+);
 
-// 检查是否配置了 R2 凭据
-export const isR2Configured = !!(R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY);
+// 初始化S3客户端
+let r2Client: S3Client | null = null;
 
-// 创建 R2 客户端
-let r2ClientInitialized = false;
-let r2ClientInitError: any = null;
-export const r2Client = (() => {
-  if (!isR2Configured) {
-    console.log('R2 凭据未配置，将使用本地存储');
-    return null;
-  }
-  
+if (isR2Configured) {
   try {
-    console.log(`正在初始化 R2 客户端，Account ID: ${R2_ACCOUNT_ID}, Bucket: ${R2_BUCKET_NAME}`);
-    const client = new S3Client({
+    r2Client = new S3Client({
       region: 'auto',
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint,
       credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID!,
-        secretAccessKey: R2_SECRET_ACCESS_KEY!,
+        accessKeyId: r2AccessKeyId,
+        secretAccessKey: r2SecretAccessKey,
       },
     });
-    r2ClientInitialized = true;
-    console.log('R2 客户端初始化成功');
-    return client;
+    console.log('R2客户端初始化成功');
   } catch (error) {
-    console.error('初始化 R2 客户端失败:', error);
-    r2ClientInitError = error;
-    return null;
+    console.error('初始化R2客户端失败:', error);
+    r2Client = null;
   }
-})();
+} else {
+  console.log('R2配置不完整，存储功能将回退到本地文件系统');
+}
 
-// 验证 R2 连接是否正常
+// 验证R2连接
 export async function validateR2Connection(): Promise<boolean> {
-  if (!isR2Configured || !r2Client) {
-    console.log('R2 未配置，无法验证连接');
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法验证连接');
     return false;
   }
 
   try {
-    console.log('测试 R2 连接...');
-    // 尝试列出文件以验证连接
-    const command = new ListObjectsCommand({
-      Bucket: R2_BUCKET_NAME,
-      MaxKeys: 1, // 只获取一个对象以减少负担
-    });
-
-    await r2Client.send(command);
-    console.log('R2 连接测试成功');
-    return true;
-  } catch (error) {
-    console.error('R2 连接测试失败:', error);
-    return false;
-  }
-}
-
-/**
- * 上传文件到 R2 存储
- * @param key 文件的键/路径
- * @param body 文件内容
- * @param metadata 可选的元数据
- * @param contentType 内容类型
- * @returns 成功返回 true，失败返回 false
- */
-export async function uploadToR2(
-  key: string,
-  body: Buffer,
-  metadata?: Record<string, string>,
-  contentType: string = 'application/octet-stream'
-): Promise<boolean> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法上传文件:', key);
-    return false;
-  }
-
-  console.log(`开始上传文件到 R2: ${key}, 大小: ${body.length} 字节, 类型: ${contentType}`);
-  
-  try {
-    // 设置一天后的过期时间 (24小时)
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    // 添加创建时间和过期时间到元数据
-    const fileMetadata = {
-      ...metadata,
-      'created-at': new Date().toISOString(),
-      'expires-at': expiresAt.toISOString(),
-      'content-length': body.length.toString(),
-    };
-
-    console.log(`文件元数据: ${JSON.stringify(fileMetadata)}`);
-
-    // 准备上传命令
-    const command = new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-      Body: body,
-      Metadata: fileMetadata,
-      ContentType: contentType,
-      // 设置缓存控制和过期时间
-      CacheControl: 'max-age=86400',
-      Expires: expiresAt,
-    });
-
-    // 执行上传
-    const result = await r2Client.send(command);
-    console.log(`文件上传成功: ${key}, ETag: ${result.ETag}`);
-    
-    // 验证文件是否确实存在
-    const exists = await fileExistsInR2(key);
-    if (exists) {
-      console.log(`已确认文件在 R2 中存在: ${key}`);
-    } else {
-      console.warn(`警告: 文件上传成功但验证未通过: ${key}`);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error(`上传文件到 R2 失败 (${key}):`, error);
-    return false;
-  }
-}
-
-/**
- * 从 R2 下载文件
- * @param key 文件键/路径
- * @returns 成功时返回文件内容，失败时返回 null
- */
-export async function downloadFromR2(key: string): Promise<Buffer | null> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法下载文件:', key);
-    return null;
-  }
-
-  console.log(`开始从 R2 下载文件: ${key}`);
-  
-  try {
-    // 首先检查文件是否存在
-    const exists = await fileExistsInR2(key);
-    if (!exists) {
-      console.error(`文件在 R2 中不存在: ${key}`);
-      return null;
-    }
-    
-    const command = new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
+    console.log('开始验证R2连接...');
+    // 尝试列出桶中的对象（限制为1个）以验证连接
+    const command = new ListObjectsV2Command({
+      Bucket: r2BucketName,
+      MaxKeys: 1, // 只需要1个对象来验证连接
     });
 
     const response = await r2Client.send(command);
-    
-    if (!response.Body) {
-      console.error(`从 R2 下载文件失败 (${key}): 响应中没有文件内容`);
-      return null;
-    }
-
-    console.log(`文件响应头: ${JSON.stringify({
-      ContentType: response.ContentType,
-      ContentLength: response.ContentLength,
-      Metadata: response.Metadata,
-    })}`);
-
-    // 将可读流转换为 Buffer
-    const chunks: Buffer[] = [];
-    const stream = response.Body as any;
-    
-    return new Promise((resolve, reject) => {
-      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-      stream.on('error', (err: Error) => {
-        console.error(`从 R2 读取文件流失败 (${key}):`, err);
-        reject(err);
-      });
-      stream.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        console.log(`文件下载成功: ${key} (${buffer.length} 字节)`);
-        resolve(buffer);
-      });
-    });
-  } catch (error) {
-    console.error(`从 R2 下载文件失败 (${key}):`, error);
-    return null;
-  }
-}
-
-/**
- * 检查 R2 中的文件是否存在
- * @param key 文件键/路径
- * @returns 文件存在返回 true，否则返回 false
- */
-export async function fileExistsInR2(key: string): Promise<boolean> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法检查文件');
-    return false;
-  }
-
-  try {
-    const command = new HeadObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-    });
-
-    await r2Client.send(command);
+    console.log('R2连接验证成功，桶存在');
     return true;
   } catch (error) {
-    // 如果文件不存在，不记录错误，只返回 false
+    console.error('R2连接验证失败:', error);
     return false;
   }
 }
 
-/**
- * 从 R2 删除文件
- * @param key 文件键/路径
- * @returns 成功返回 true，失败返回 false
- */
-export async function deleteFromR2(key: string): Promise<boolean> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法删除文件');
+// 上传文件到R2
+export async function uploadToR2(
+  key: string, 
+  fileBuffer: Buffer, 
+  metadata: Record<string, string> = {}, 
+  contentType = 'application/octet-stream'
+): Promise<boolean> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法上传文件');
     return false;
   }
 
-  try {
-    const command = new DeleteObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-    });
-
-    await r2Client.send(command);
-    console.log(`文件删除成功: ${key}`);
-    return true;
-  } catch (error) {
-    console.error(`从 R2 删除文件失败 (${key}):`, error);
-    return false;
-  }
-}
-
-/**
- * 生成文件的预签名 URL，用于临时访问
- * @param key 文件键/路径
- * @param expirationSeconds URL 有效期（秒）
- * @returns 预签名 URL 或 null（如果失败）
- */
-export async function generatePresignedUrl(
-  key: string,
-  expirationSeconds: number = 86400 // 默认 24 小时
-): Promise<string | null> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法生成预签名 URL:', key);
-    return null;
-  }
-
-  console.log(`开始为文件生成预签名 URL: ${key}, 有效期: ${expirationSeconds}秒`);
+  console.log(`正在上传文件到R2: ${key}, 大小: ${fileBuffer.length} 字节, 类型: ${contentType}`);
   
   try {
-    // 先检查文件是否存在
-    const exists = await fileExistsInR2(key);
-    if (!exists) {
-      console.error(`无法生成预签名 URL，文件在 R2 中不存在: ${key}`);
-      return null;
-    }
+    // 添加时间戳元数据
+    const timestampedMetadata = {
+      ...metadata,
+      'upload-timestamp': Date.now().toString(),
+    };
     
+    // 构建上传命令
+    const command = new PutObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+      Metadata: timestampedMetadata,
+    });
+
+    // 发送上传命令
+    const result = await r2Client.send(command);
+    console.log(`文件成功上传到R2: ${key}, ETag: ${result.ETag}`);
+    
+    return true;
+  } catch (error) {
+    console.error(`上传文件到R2失败: ${key}`, error);
+    return false;
+  }
+}
+
+// 检查文件是否存在于R2
+export async function fileExistsInR2(key: string): Promise<boolean> {
+  if (!r2Client) {
+    console.log('R2客户端未初始化，无法检查文件');
+    return false;
+  }
+
+  try {
+    console.log(`检查文件是否存在于R2: ${key}`);
     const command = new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: r2BucketName,
       Key: key,
     });
 
-    const url = await getSignedUrl(r2Client, command, {
-      expiresIn: expirationSeconds,
+    await r2Client.send(command);
+    console.log(`文件存在于R2: ${key}`);
+    return true;
+  } catch (error) {
+    console.log(`文件不存在于R2: ${key}`);
+    return false;
+  }
+}
+
+// 从R2下载文件
+export async function downloadFromR2(key: string): Promise<Buffer | null> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法下载文件');
+    return null;
+  }
+
+  try {
+    console.log(`从R2下载文件: ${key}`);
+    const command = new GetObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
     });
 
-    console.log(`预签名 URL 生成成功: ${key}, URL长度: ${url.length}字符`);
-    // 不打印完整URL以避免泄露，只打印前30个字符
-    console.log(`预签名 URL 前缀: ${url.substring(0, 30)}...`);
+    const result = await r2Client.send(command);
     
+    if (!result.Body) {
+      console.error(`从R2下载文件失败: ${key}, 没有返回数据`);
+      return null;
+    }
+
+    // 转换ReadableStream为Buffer
+    const chunks: Uint8Array[] = [];
+    const stream = result.Body as any;
+    
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    
+    const buffer = Buffer.concat(chunks);
+    console.log(`从R2下载文件成功: ${key}, 大小: ${buffer.length} 字节`);
+    return buffer;
+  } catch (error) {
+    console.error(`从R2下载文件失败: ${key}`, error);
+    return null;
+  }
+}
+
+// 生成预签名URL (有效期30分钟)
+export async function generatePresignedUrl(key: string, expiresIn: number = 30 * 60): Promise<string | null> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法生成预签名URL');
+    return null;
+  }
+
+  try {
+    console.log(`为${key}生成预签名URL, 有效期: ${expiresIn}秒`);
+    const command = new GetObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(r2Client, command, { expiresIn });
+    console.log(`已生成预签名URL: ${url.substring(0, 50)}...`);
     return url;
   } catch (error) {
-    console.error(`生成预签名 URL 失败 (${key}):`, error);
+    console.error(`生成预签名URL失败: ${key}`, error);
     return null;
   }
 }
 
-/**
- * 列出 R2 存储桶中的文件
- * @param prefix 可选的前缀过滤
- * @returns 文件键列表或空数组（如果失败）
- */
-export async function listFilesInR2(prefix?: string): Promise<string[]> {
-  if (!isR2Configured || !r2Client) {
-    console.warn('R2 未配置，无法列出文件');
+// 删除R2对象
+export async function deleteFromR2(key: string): Promise<boolean> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法删除文件');
+    return false;
+  }
+
+  try {
+    console.log(`删除R2文件: ${key}`);
+    const command = new DeleteObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+    });
+
+    await r2Client.send(command);
+    console.log(`文件已从R2删除: ${key}`);
+    return true;
+  } catch (error) {
+    console.error(`删除R2文件失败: ${key}`, error);
+    return false;
+  }
+}
+
+// 列出R2中的对象
+export async function listR2Objects(prefix: string = '', limit: number = 100): Promise<Array<any>> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法列出对象');
     return [];
   }
 
   try {
-    const command = new ListObjectsCommand({
-      Bucket: R2_BUCKET_NAME,
+    console.log(`列出R2对象, 前缀: ${prefix}, 限制: ${limit}`);
+    const command = new ListObjectsV2Command({
+      Bucket: r2BucketName,
       Prefix: prefix,
+      MaxKeys: limit
     });
 
-    const response = await r2Client.send(command);
+    const result = await r2Client.send(command);
+    const objects = result.Contents || [];
+    console.log(`找到${objects.length}个对象`);
     
-    if (!response.Contents) {
-      return [];
-    }
-
-    return response.Contents.map(item => item.Key!).filter(Boolean);
+    return objects.map(obj => ({
+      key: obj.Key,
+      size: obj.Size,
+      lastModified: obj.LastModified
+    }));
   } catch (error) {
-    console.error(`列出 R2 文件失败:`, error);
+    console.error(`列出R2对象失败:`, error);
     return [];
   }
 }
 
-// 列出R2存储桶中的对象
-export async function listR2Objects(prefix: string, limit: number = 100): Promise<Array<{ key: string, size: number, lastModified: string }>> {
-  if (!r2Client) {
-    console.error('R2 client not initialized');
-    return [];
-  }
-  
-  try {
-    const options = { prefix, limit };
-    const objects = await r2Client.list(options);
-    
-    if (!objects || !objects.objects) {
-      return [];
-    }
-    
-    return objects.objects.map(obj => ({
-      key: obj.key,
-      size: obj.size,
-      lastModified: obj.uploaded.toISOString()
-    }));
-  } catch (error) {
-    console.error('Error listing R2 objects:', error);
-    return [];
-  }
+// 设置R2对象的生命周期（在服务器端设置过期时间）
+export async function setupR2Lifecycle(expireDays: number = 1): Promise<boolean> {
+  console.log(`R2生命周期管理需要在Cloudflare dashboard中配置`);
+  console.log(`请访问 https://dash.cloudflare.com/ 设置对象生命周期规则`);
+  console.log(`建议为wav/和shares/目录设置 ${expireDays} 天的过期时间`);
+  return false;
 } 

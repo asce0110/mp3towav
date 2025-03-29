@@ -1,150 +1,199 @@
+#!/usr/bin/env node
+
 /**
- * R2存储桶定时清理脚本
- * 删除超过24小时的文件
- * 
- * 使用方法:
- * 1. 确保已设置环境变量: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
- * 2. 执行: node scripts/cleanup-r2.js
- * 
- * 可以设置为cron任务，每小时运行一次:
- * 0 * * * * node /path/to/scripts/cleanup-r2.js >> /path/to/logs/r2-cleanup.log 2>&1
+ * 此脚本用于清理R2存储中的过期文件和分享链接
+ * 可以通过Cloudflare Workers或作为定时任务运行
  */
 
-// 导入必要的模块
-require('dotenv').config({ path: '.env.local' });
-const { S3Client, ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client } = require('@aws-sdk/client-s3');
+const { ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
-// R2 配置
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+// 从环境变量获取R2配置
+const r2AccountId = process.env.R2_ACCOUNT_ID;
+const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
+const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+const r2BucketName = process.env.R2_BUCKET_NAME;
 
-// 检查配置
-if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-  console.error('错误: 缺少R2配置。请确保设置了所有必要的环境变量。');
+// 检查配置是否完整
+if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey || !r2BucketName) {
+  console.error('错误: R2配置不完整，请设置所有必要的环境变量');
+  console.error('需要设置: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME');
   process.exit(1);
 }
 
-// 创建R2客户端
+// 创建S3客户端
 const r2Client = new S3Client({
   region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
+    accessKeyId: r2AccessKeyId,
+    secretAccessKey: r2SecretAccessKey,
   },
 });
 
-/**
- * 列出R2存储桶中的所有文件
- * @param {string} [continuationToken] 分页标记
- * @param {Array} [accumulatedFiles=[]] 累积的文件列表
- * @returns {Promise<Array>} 文件对象数组
- */
-async function listAllFiles(continuationToken, accumulatedFiles = []) {
-  const command = new ListObjectsV2Command({
-    Bucket: R2_BUCKET_NAME,
-    MaxKeys: 1000,
-    ContinuationToken: continuationToken,
-  });
+// 计算过期时间 (24小时之前)
+const expirationTime = Date.now() - 24 * 60 * 60 * 1000;
+console.log(`清理早于 ${new Date(expirationTime).toISOString()} 的对象`);
 
-  const response = await r2Client.send(command);
-  
-  // 合并结果
-  const allFiles = [...accumulatedFiles, ...(response.Contents || [])];
-  
-  // 如果有更多结果，继续获取
-  if (response.IsTruncated) {
-    return listAllFiles(response.NextContinuationToken, allFiles);
-  }
-  
-  return allFiles;
-}
-
-/**
- * 删除单个文件
- * @param {string} key 文件键
- * @returns {Promise<boolean>} 是否成功
- */
-async function deleteFile(key) {
-  try {
-    const command = new DeleteObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: key,
-    });
-    
-    await r2Client.send(command);
-    return true;
-  } catch (error) {
-    console.error(`删除文件失败: ${key}`, error);
-    return false;
-  }
-}
-
-/**
- * 主函数 - 清理超过指定时间的文件
- * @param {number} [hoursThreshold=24] 时间阈值(小时)
- */
-async function cleanupOldFiles(hoursThreshold = 24) {
-  console.log(`===== ${new Date().toISOString()} - 开始R2存储桶清理 =====`);
-  console.log(`清理超过 ${hoursThreshold} 小时的文件`);
+// 列出并清理分享信息文件
+async function cleanupSharesFiles() {
+  console.log('开始清理分享信息文件...');
   
   try {
-    // 计算时间阈值
-    const thresholdDate = new Date();
-    thresholdDate.setHours(thresholdDate.getHours() - hoursThreshold);
-    
-    console.log(`时间阈值: ${thresholdDate.toISOString()}`);
-    
-    // 获取所有文件
-    console.log('获取存储桶中的所有文件...');
-    const files = await listAllFiles();
-    console.log(`共找到 ${files.length} 个文件`);
-    
-    // 筛选出过期文件
-    const expiredFiles = files.filter(file => {
-      return new Date(file.LastModified) < thresholdDate;
+    // 列出shares/目录中的文件
+    const command = new ListObjectsV2Command({
+      Bucket: r2BucketName,
+      Prefix: 'shares/',
     });
     
-    console.log(`找到 ${expiredFiles.length} 个超过 ${hoursThreshold} 小时的文件`);
+    let count = 0;
+    let expiredCount = 0;
     
-    // 删除过期文件
-    if (expiredFiles.length > 0) {
-      console.log('开始删除过期文件...');
+    // 处理分页返回的结果
+    let isTruncated = true;
+    let continuationToken = undefined;
+    
+    while (isTruncated) {
+      const response = await r2Client.send(
+        new ListObjectsV2Command({
+          Bucket: r2BucketName,
+          Prefix: 'shares/',
+          ContinuationToken: continuationToken,
+        })
+      );
       
-      let successCount = 0;
-      let failureCount = 0;
+      const objects = response.Contents || [];
+      count += objects.length;
       
-      for (const file of expiredFiles) {
-        const success = await deleteFile(file.Key);
-        if (success) {
-          successCount++;
-          console.log(`已删除: ${file.Key} (修改于 ${file.LastModified})`);
-        } else {
-          failureCount++;
+      for (const obj of objects) {
+        // 检查对象是否过期
+        try {
+          // 获取对象的元数据
+          const headCommand = new ListObjectsV2Command({
+            Bucket: r2BucketName,
+            Prefix: obj.Key,
+            MaxKeys: 1,
+          });
+          
+          const headResponse = await r2Client.send(headCommand);
+          const objDetails = headResponse.Contents && headResponse.Contents[0];
+          
+          // 检查最后修改时间是否早于过期时间
+          if (objDetails && objDetails.LastModified && objDetails.LastModified.getTime() < expirationTime) {
+            console.log(`删除过期的分享文件: ${obj.Key}`);
+            
+            await r2Client.send(
+              new DeleteObjectCommand({
+                Bucket: r2BucketName,
+                Key: obj.Key,
+              })
+            );
+            
+            expiredCount++;
+          }
+        } catch (error) {
+          console.error(`获取对象元数据时出错 (${obj.Key}):`, error);
         }
       }
       
-      console.log(`删除完成: 成功=${successCount}, 失败=${failureCount}`);
-    } else {
-      console.log('没有需要删除的文件');
+      // 检查是否有更多结果
+      isTruncated = response.IsTruncated;
+      continuationToken = response.NextContinuationToken;
     }
     
-    console.log('R2存储桶清理完成');
+    console.log(`扫描了 ${count} 个分享文件，删除了 ${expiredCount} 个过期文件`);
   } catch (error) {
-    console.error('R2存储桶清理失败:', error);
+    console.error('清理分享文件时出错:', error);
   }
-  
-  console.log(`===== ${new Date().toISOString()} - 清理结束 =====\n`);
 }
 
-// 立即执行清理
-cleanupOldFiles()
-  .then(() => {
-    console.log('清理任务执行完毕');
-  })
-  .catch(error => {
-    console.error('清理任务执行失败:', error);
-    process.exit(1);
-  }); 
+// 列出并清理WAV文件
+async function cleanupWavFiles() {
+  console.log('开始清理WAV文件...');
+  
+  try {
+    // 列出wav/目录中的文件
+    const command = new ListObjectsV2Command({
+      Bucket: r2BucketName,
+      Prefix: 'wav/',
+    });
+    
+    let count = 0;
+    let expiredCount = 0;
+    
+    // 处理分页返回的结果
+    let isTruncated = true;
+    let continuationToken = undefined;
+    
+    while (isTruncated) {
+      const response = await r2Client.send(
+        new ListObjectsV2Command({
+          Bucket: r2BucketName,
+          Prefix: 'wav/',
+          ContinuationToken: continuationToken,
+        })
+      );
+      
+      const objects = response.Contents || [];
+      count += objects.length;
+      
+      for (const obj of objects) {
+        // 检查对象是否过期
+        try {
+          // 获取对象的元数据
+          const headCommand = new ListObjectsV2Command({
+            Bucket: r2BucketName,
+            Prefix: obj.Key,
+            MaxKeys: 1,
+          });
+          
+          const headResponse = await r2Client.send(headCommand);
+          const objDetails = headResponse.Contents && headResponse.Contents[0];
+          
+          // 检查最后修改时间是否早于过期时间
+          if (objDetails && objDetails.LastModified && objDetails.LastModified.getTime() < expirationTime) {
+            console.log(`删除过期的WAV文件: ${obj.Key}`);
+            
+            await r2Client.send(
+              new DeleteObjectCommand({
+                Bucket: r2BucketName,
+                Key: obj.Key,
+              })
+            );
+            
+            expiredCount++;
+          }
+        } catch (error) {
+          console.error(`获取对象元数据时出错 (${obj.Key}):`, error);
+        }
+      }
+      
+      // 检查是否有更多结果
+      isTruncated = response.IsTruncated;
+      continuationToken = response.NextContinuationToken;
+    }
+    
+    console.log(`扫描了 ${count} 个WAV文件，删除了 ${expiredCount} 个过期文件`);
+  } catch (error) {
+    console.error('清理WAV文件时出错:', error);
+  }
+}
+
+// 运行清理任务
+async function runCleanup() {
+  console.log('开始清理R2存储中的过期文件...');
+  
+  try {
+    await cleanupSharesFiles();
+    await cleanupWavFiles();
+    console.log('R2存储清理完成!');
+  } catch (error) {
+    console.error('R2存储清理失败:', error);
+  }
+}
+
+// 执行清理任务
+runCleanup().catch(error => {
+  console.error('执行清理任务时发生错误:', error);
+  process.exit(1);
+}); 
