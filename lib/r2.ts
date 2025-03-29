@@ -94,11 +94,19 @@ export async function uploadToR2(
   contentType = 'application/octet-stream'
 ): Promise<boolean> {
   if (!r2Client) {
-    console.error('R2客户端未初始化，无法上传文件');
+    console.error('[R2] 客户端未初始化，无法上传文件。检查环境变量配置');
+    // 输出当前环境变量状态（不显示实际值）
+    console.log('[R2] 环境变量状态:', {
+      R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+      R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+      R2_BUCKET_NAME: !!process.env.R2_BUCKET_NAME
+    });
     return false;
   }
 
-  console.log(`正在上传文件到R2: ${key}, 大小: ${fileBuffer.length} 字节, 类型: ${contentType}`);
+  console.log(`[R2] 准备上传文件: ${key}, 大小: ${fileBuffer.length} 字节, 类型: ${contentType}`);
+  console.log(`[R2] 使用存储桶: ${r2BucketName}, 端点: ${endpoint}`);
   
   try {
     // 添加时间戳元数据
@@ -106,6 +114,8 @@ export async function uploadToR2(
       ...metadata,
       'upload-timestamp': Date.now().toString(),
     };
+    
+    console.log(`[R2] 构建上传命令，包含元数据:`, Object.keys(timestampedMetadata));
     
     // 构建上传命令
     const command = new PutObjectCommand({
@@ -116,13 +126,32 @@ export async function uploadToR2(
       Metadata: timestampedMetadata,
     });
 
+    console.log(`[R2] 发送上传命令...`);
+    
     // 发送上传命令
     const result = await r2Client.send(command);
-    console.log(`文件成功上传到R2: ${key}, ETag: ${result.ETag}`);
+    console.log(`[R2] 文件成功上传: ${key}, ETag: ${result.ETag}`);
+    
+    // 验证文件是否已上传
+    try {
+      console.log(`[R2] 验证文件是否已上传: ${key}`);
+      const exists = await fileExistsInR2(key);
+      if (exists) {
+        console.log(`[R2] 文件验证成功: ${key}`);
+      } else {
+        console.warn(`[R2] 文件验证失败，可能上传不完整: ${key}`);
+      }
+    } catch (verifyError) {
+      console.error(`[R2] 文件验证出错: ${key}`, verifyError);
+    }
     
     return true;
   } catch (error) {
-    console.error(`上传文件到R2失败: ${key}`, error);
+    console.error(`[R2] 上传文件失败: ${key}`, error);
+    if (error instanceof Error) {
+      console.error(`[R2] 错误详情: ${error.name}: ${error.message}`);
+      console.error(`[R2] 错误堆栈: ${error.stack}`);
+    }
     return false;
   }
 }
