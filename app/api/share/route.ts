@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { isR2Configured, fileExistsInR2, generatePresignedUrl, validateR2Connection } from '@/lib/r2';
+import { 
+  isR2Configured, 
+  fileExistsInR2, 
+  generatePresignedUrl, 
+  validateR2Connection,
+  uploadToR2,
+  downloadFromR2
+} from '@/lib/r2';
 
 // 定义共享文件的数据结构
 interface ShareInfo {
@@ -14,189 +21,135 @@ interface ShareInfo {
 // 模拟数据库存储，使用内存缓存
 const sharesCache = new Map<string, ShareInfo>();
 
-// Vercel内部存储 - 服务器端组件共享此变量，但每次部署会重置
-let serverShares: Record<string, ShareInfo> = {};
-
-// 临时文件和分享信息存储目录
+// 临时文件目录
 const TMP_DIR = path.join(process.cwd(), 'tmp');
-const SHARES_DIR = path.join(TMP_DIR, 'shares');
 
-// 检查Vercel环境
+// 检查环境
 const isVercelEnv = process.env.VERCEL === '1';
 console.log(`当前环境: ${isVercelEnv ? 'Vercel' : '本地开发'}`);
 console.log(`当前工作目录: ${process.cwd()}`);
 console.log(`TMP_DIR 路径: ${TMP_DIR}`);
-console.log(`SHARES_DIR 路径: ${SHARES_DIR}`);
 
-// 在应用启动时确保目录存在
-function ensureDirectoriesExist() {
+// 确保临时目录存在
+function ensureTmpDir() {
   try {
-    // 确保临时目录存在
     if (!fs.existsSync(TMP_DIR)) {
       fs.mkdirSync(TMP_DIR, { recursive: true });
       console.log(`创建临时目录: ${TMP_DIR}`);
-    } else {
-      console.log(`临时目录已存在: ${TMP_DIR}`);
-      try {
-        // 列出目录内容
-        const files = fs.readdirSync(TMP_DIR);
-        console.log(`TMP_DIR内容: ${files.length > 0 ? files.join(', ') : '空目录'}`);
-      } catch (e) {
-        console.error(`无法读取TMP_DIR内容:`, e);
-      }
-    }
-    
-    // 确保分享信息目录存在
-    if (!fs.existsSync(SHARES_DIR)) {
-      fs.mkdirSync(SHARES_DIR, { recursive: true });
-      console.log(`创建分享目录: ${SHARES_DIR}`);
-    } else {
-      console.log(`分享目录已存在: ${SHARES_DIR}`);
-      try {
-        // 列出目录内容
-        const files = fs.readdirSync(SHARES_DIR);
-        console.log(`SHARES_DIR内容: ${files.length > 0 ? files.join(', ') : '空目录'}`);
-      } catch (e) {
-        console.error(`无法读取SHARES_DIR内容:`, e);
-      }
-    }
-    
-    // 在Vercel环境做额外测试
-    if (isVercelEnv) {
-      console.log(`在Vercel环境进行目录写入测试`);
-      const testFile = path.join(TMP_DIR, '_test_write.txt');
-      try {
-        fs.writeFileSync(testFile, `Test file created at ${new Date().toISOString()}`);
-        console.log(`测试文件写入成功: ${testFile}`);
-        
-        // 验证文件存在
-        if (fs.existsSync(testFile)) {
-          const content = fs.readFileSync(testFile, 'utf8');
-          console.log(`测试文件内容: ${content.substring(0, 30)}...`);
-          
-          // 尝试删除测试文件
-          fs.unlinkSync(testFile);
-          console.log(`测试文件删除成功`);
-        } else {
-          console.error(`测试文件写入后无法验证存在: ${testFile}`);
-        }
-      } catch (e) {
-        console.error(`Vercel环境文件写入测试失败:`, e);
-      }
     }
   } catch (error) {
-    console.error('创建必要目录失败:', error);
+    console.error('创建临时目录失败:', error);
   }
 }
 
-// 立即执行确保目录存在
-ensureDirectoriesExist();
+// 立即执行确保临时目录存在
+ensureTmpDir();
 
-// 从数据存储加载分享信息
-function loadShareInfo(shareId: string): ShareInfo | null {
-  console.log(`尝试加载分享信息: ${shareId}`);
+// 从R2加载分享信息
+async function loadShareInfoFromR2(shareId: string): Promise<ShareInfo | null> {
+  console.log(`尝试从R2加载分享数据: ${shareId}`);
   
-  // 首先从内存缓存检查
-  if (sharesCache.has(shareId)) {
-    console.log(`从内存缓存加载分享: ${shareId}`);
-    return sharesCache.get(shareId) || null;
+  if (!isR2Configured) {
+    console.log(`R2未配置，无法从R2加载分享`);
+    return null;
   }
   
-  // 然后从服务器变量检查
-  if (serverShares[shareId]) {
-    console.log(`从服务器变量加载分享: ${shareId}`);
-    const shareInfo = serverShares[shareId];
-    // 更新内存缓存
-    sharesCache.set(shareId, shareInfo);
-    return shareInfo;
-  }
-  
-  // 最后从文件系统检查
   try {
-    console.log(`尝试从文件系统加载分享: ${shareId}`);
-    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
-    if (!fs.existsSync(sharePath)) {
-      console.log(`文件系统中不存在分享文件: ${sharePath}`);
+    // 检查分享数据在R2中是否存在
+    const shareExists = await fileExistsInR2(`shares/${shareId}.json`);
+    if (!shareExists) {
+      console.log(`R2中不存在分享数据: ${shareId}`);
       return null;
     }
     
-    const shareData = fs.readFileSync(sharePath, 'utf-8');
-    console.log(`已读取分享文件内容: ${shareData.substring(0, 50)}...`);
+    // 下载分享数据
+    const shareBuffer = await downloadFromR2(`shares/${shareId}.json`);
+    if (!shareBuffer) {
+      console.log(`从R2下载分享数据失败: ${shareId}`);
+      return null;
+    }
     
+    // 解析分享数据
     try {
+      const shareData = shareBuffer.toString('utf-8');
+      console.log(`解析分享数据: ${shareData.substring(0, 50)}...`);
       const shareInfo = JSON.parse(shareData) as ShareInfo;
       
-      // 更新缓存
+      // 添加到内存缓存
       sharesCache.set(shareId, shareInfo);
-      serverShares[shareId] = shareInfo;
       
-      console.log(`成功从文件加载并解析分享: ${shareId}`);
       return shareInfo;
     } catch (parseError) {
-      console.error(`解析分享JSON失败: ${shareId}`, parseError);
+      console.error(`解析分享数据JSON失败:`, parseError);
       return null;
     }
   } catch (error) {
-    console.error(`从文件系统加载分享失败: ${shareId}`, error);
+    console.error(`从R2加载分享数据时出错:`, error);
     return null;
   }
 }
 
-// 保存分享信息到存储
-function saveShareInfo(shareId: string, shareInfo: ShareInfo) {
-  console.log(`正在保存分享信息: ${shareId}`);
+// 保存分享信息到R2
+async function saveShareInfoToR2(shareId: string, shareInfo: ShareInfo): Promise<boolean> {
+  console.log(`尝试保存分享数据到R2: ${shareId}`);
   
-  // 同时保存到所有存储位置
-  
-  // 1. 内存缓存
-  sharesCache.set(shareId, shareInfo);
-  
-  // 2. 服务器变量
-  serverShares[shareId] = shareInfo;
-  console.log(`分享已保存到服务器变量: ${shareId}`);
-  
-  // 3. 文件系统 (尽最大努力，但可能在Vercel上不可靠)
-  try {
-    ensureDirectoriesExist();
-    
-    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
-    const shareData = JSON.stringify(shareInfo);
-    
-    console.log(`尝试保存分享到文件: ${sharePath}`);
-    fs.writeFileSync(sharePath, shareData, 'utf-8');
-    
-    if (fs.existsSync(sharePath)) {
-      console.log(`分享文件已成功写入: ${sharePath}`);
-    } else {
-      console.warn(`分享文件写入后无法验证存在: ${sharePath}`);
-    }
-  } catch (error) {
-    console.warn(`保存分享到文件系统失败 (非致命错误): ${shareId}`, error);
-    // 不抛出错误，因为我们仍然有内存缓存和服务器变量
+  if (!isR2Configured) {
+    console.log(`R2未配置，无法保存分享到R2`);
+    return false;
   }
   
-  return true;
+  try {
+    // 首先保存到内存缓存
+    sharesCache.set(shareId, shareInfo);
+    
+    // 转换为JSON
+    const shareData = JSON.stringify(shareInfo);
+    const shareBuffer = Buffer.from(shareData, 'utf-8');
+    
+    // 上传到R2
+    const success = await uploadToR2(
+      `shares/${shareId}.json`,
+      shareBuffer,
+      {
+        'share-id': shareId,
+        'file-id': shareInfo.fileId,
+        'created-at': new Date(shareInfo.createdAt).toISOString(),
+        'expires-at': new Date(shareInfo.expiresAt).toISOString()
+      },
+      'application/json'
+    );
+    
+    if (success) {
+      console.log(`分享数据成功保存到R2: ${shareId}`);
+      return true;
+    } else {
+      console.error(`保存分享数据到R2失败: ${shareId}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`保存分享数据到R2时出错:`, error);
+    return false;
+  }
 }
 
 // 从所有存储中删除分享信息
-function removeShareInfo(shareId: string) {
+async function removeShareInfo(shareId: string): Promise<void> {
   console.log(`删除分享: ${shareId}`);
   
   // 从内存缓存删除
   sharesCache.delete(shareId);
   
-  // 从服务器变量删除
-  delete serverShares[shareId];
-  
-  // 从文件系统删除
-  try {
-    const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
-    if (fs.existsSync(sharePath)) {
-      fs.unlinkSync(sharePath);
-      console.log(`分享文件已从文件系统删除: ${sharePath}`);
+  // 从R2删除
+  if (isR2Configured) {
+    try {
+      await uploadToR2(`shares/${shareId}.json`, Buffer.from('{"deleted":true}'), { 
+        'deleted': 'true',
+        'deleted-at': new Date().toISOString()
+      });
+      console.log(`已将分享标记为已删除: ${shareId}`);
+    } catch (error) {
+      console.warn(`标记分享为已删除失败: ${shareId}`, error);
     }
-  } catch (error) {
-    console.warn(`从文件系统删除分享失败 (非致命错误): ${shareId}`, error);
   }
 }
 
@@ -211,57 +164,74 @@ export async function POST(request: NextRequest) {
     
     console.log(`创建分享: fileId=${fileId}, originalName=${originalName || '未指定'}`);
     
-    // 如果R2可用，检查连接状态
-    if (isR2Configured) {
-      try {
-        console.log('检查R2连接状态...');
-        const isConnected = await validateR2Connection();
-        if (!isConnected) {
-          console.warn('R2连接失败，将使用本地存储');
-        } else {
-          console.log('R2连接成功，将使用R2存储');
-        }
-      } catch (r2Error) {
-        console.error('R2连接测试异常:', r2Error);
-      }
+    // 检查R2是否已配置
+    if (!isR2Configured) {
+      console.error('R2未配置，无法创建分享');
+      return NextResponse.json({ 
+        error: 'R2 storage not configured', 
+        detail: 'Cloud storage is required for file sharing feature'
+      }, { status: 500 });
     }
     
-    // 检查文件是否存在 (首先检查R2，然后检查本地)
+    // 检查R2连接
+    try {
+      console.log('检查R2连接状态...');
+      const isConnected = await validateR2Connection();
+      if (!isConnected) {
+        console.error('R2连接失败，无法创建分享');
+        return NextResponse.json({ 
+          error: 'R2 connection failed', 
+          detail: 'Could not connect to cloud storage'
+        }, { status: 500 });
+      }
+    } catch (r2Error) {
+      console.error('R2连接测试异常:', r2Error);
+      return NextResponse.json({ 
+        error: 'R2 connection test failed', 
+        detail: 'Error testing connection to cloud storage'
+      }, { status: 500 });
+    }
+    
+    // 检查文件是否存在于R2
+    console.log(`检查文件是否存在于R2: wav/${fileId}.wav`);
     let fileExists = false;
-    let storageType = '未知';
     
-    if (isR2Configured) {
-      // 检查文件是否存在于R2
-      console.log(`检查文件是否存在于R2: wav/${fileId}.wav`);
-      try {
-        fileExists = await fileExistsInR2(`wav/${fileId}.wav`);
-        if (fileExists) {
-          console.log(`文件存在于R2: wav/${fileId}.wav`);
-          storageType = 'R2';
+    try {
+      fileExists = await fileExistsInR2(`wav/${fileId}.wav`);
+      if (!fileExists) {
+        console.log(`文件不存在于R2: wav/${fileId}.wav, 尝试检查本地文件...`);
+        
+        // 检查本地文件并上传到R2
+        const localFilePath = path.join(TMP_DIR, `${fileId}.wav`);
+        if (fs.existsSync(localFilePath)) {
+          console.log(`找到本地文件: ${localFilePath}, 尝试上传到R2...`);
+          
+          // 读取文件并上传到R2
+          const fileBuffer = fs.readFileSync(localFilePath);
+          const uploadSuccess = await uploadToR2(
+            `wav/${fileId}.wav`,
+            fileBuffer,
+            {
+              'source': 'local-file',
+              'original-name': originalName || `${fileId}.wav`
+            },
+            'audio/wav'
+          );
+          
+          if (uploadSuccess) {
+            console.log(`文件成功上传到R2: wav/${fileId}.wav`);
+            fileExists = true;
+          } else {
+            console.error(`上传文件到R2失败: wav/${fileId}.wav`);
+          }
         } else {
-          console.log(`文件不存在于R2: wav/${fileId}.wav`);
+          console.error(`本地文件也不存在: ${localFilePath}`);
         }
-      } catch (r2Error) {
-        console.error('检查R2文件时出错:', r2Error);
+      } else {
+        console.log(`文件存在于R2: wav/${fileId}.wav`);
       }
-    }
-    
-    // 如果不在R2中或R2不可用，检查本地文件系统
-    if (!fileExists) {
-      const filePath = path.join(TMP_DIR, `${fileId}.wav`);
-      try {
-        fileExists = fs.existsSync(filePath);
-        if (fileExists) {
-          console.log(`文件存在于本地: ${filePath}`);
-          const stats = fs.statSync(filePath);
-          console.log(`文件大小: ${stats.size}字节, 创建时间: ${stats.birthtime}`);
-          storageType = '本地';
-        } else {
-          console.log(`文件不存在于本地: ${filePath}`);
-        }
-      } catch (fsError) {
-        console.error('检查本地文件时出错:', fsError);
-      }
+    } catch (error) {
+      console.error('检查文件时出错:', error);
     }
     
     if (!fileExists) {
@@ -284,14 +254,12 @@ export async function POST(request: NextRequest) {
       expiresAt: expiresAt
     };
     
-    console.log(`准备保存分享信息: shareId=${finalShareId}, storageType=${storageType}`);
+    console.log(`准备保存分享信息到R2: shareId=${finalShareId}`);
     
-    // 存储分享信息到文件系统
-    try {
-      saveShareInfo(finalShareId, shareInfo);
-      console.log(`成功保存分享信息: shareId=${finalShareId}`);
-    } catch (saveError) {
-      console.error(`保存分享信息失败: shareId=${finalShareId}`, saveError);
+    // 保存分享信息到R2
+    const saveSuccess = await saveShareInfoToR2(finalShareId, shareInfo);
+    if (!saveSuccess) {
+      console.error(`保存分享信息到R2失败: shareId=${finalShareId}`);
       return NextResponse.json({ error: 'Failed to save share information' }, { status: 500 });
     }
     
@@ -303,7 +271,7 @@ export async function POST(request: NextRequest) {
       shareId: finalShareId,
       shareUrl: shareUrl,
       expiresAt: new Date(expiresAt).toISOString(),
-      storageType
+      storageType: 'R2'
     });
   } catch (error) {
     console.error('Share creation error:', error);
@@ -326,32 +294,25 @@ export async function GET(request: NextRequest) {
     // 首先从内存缓存中获取
     let shareInfo = sharesCache.get(shareId);
     
-    // 如果不在缓存中，从文件系统加载
+    // 如果不在缓存中，从R2加载
     if (!shareInfo) {
-      console.log(`API: 分享不在内存缓存中，从文件系统加载`);
-      const loadedShareInfo = loadShareInfo(shareId);
-      if (loadedShareInfo) {
-        shareInfo = loadedShareInfo;
-      } else {
-        console.log(`API: 文件系统中也未找到分享`);
+      console.log(`API: 分享不在内存缓存中，从R2加载`);
+      shareInfo = await loadShareInfoFromR2(shareId);
+      if (!shareInfo) {
+        console.log(`API: R2中也未找到分享`);
+        return NextResponse.json({ 
+          error: 'Share not found or expired',
+          detail: 'The requested share link could not be found in our system'
+        }, { status: 404 });
       }
     } else {
       console.log(`API: 从内存缓存中找到分享`);
     }
     
-    // 检查是否存在
-    if (!shareInfo) {
-      console.log(`API: 分享未找到: ${shareId}`);
-      return NextResponse.json({ 
-        error: 'Share not found or expired',
-        detail: 'The requested share link could not be found in our system'
-      }, { status: 404 });
-    }
-    
     // 检查是否过期
     if (shareInfo.expiresAt < Date.now()) {
       // 清理过期的分享
-      removeShareInfo(shareId);
+      await removeShareInfo(shareId);
       console.log(`API: 分享已过期: ${shareId}, 过期时间: ${new Date(shareInfo.expiresAt).toISOString()}`);
       return NextResponse.json({ 
         error: 'Share link has expired', 
@@ -361,39 +322,20 @@ export async function GET(request: NextRequest) {
       }, { status: 410 });
     }
     
-    // 确定下载URL
+    // 生成R2预签名URL
+    console.log(`API: 为文件生成R2预签名URL: wav/${shareInfo.fileId}.wav`);
     let downloadUrl = `/api/convert?fileId=${shareInfo.fileId}`;
-    console.log(`API: 使用默认下载URL: ${downloadUrl}`);
     
-    // 如果R2可用，生成预签名URL
-    if (isR2Configured) {
-      try {
-        console.log(`API: 尝试从R2生成预签名URL`);
-        const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
-        if (presignedUrl) {
-          downloadUrl = presignedUrl;
-          console.log(`API: 生成了R2预签名URL`);
-        } else {
-          console.log(`API: 从R2生成预签名URL失败，使用默认URL`);
-        }
-      } catch (r2Error) {
-        console.error(`API: 生成R2预签名URL错误:`, r2Error);
-      }
-    } else {
-      console.log(`API: R2未配置，使用本地文件存储`);
-      // 如果使用本地存储，检查文件是否存在
-      const filePath = path.join(TMP_DIR, `${shareInfo.fileId}.wav`);
-      if (!fs.existsSync(filePath)) {
-        // 清理失效的分享
-        removeShareInfo(shareId);
-        console.log(`API: 文件不存在: ${shareId}, 文件: ${shareInfo.fileId}.wav`);
-        return NextResponse.json({ 
-          error: 'File not available anymore',
-          detail: 'The file associated with this share link no longer exists on our servers'
-        }, { status: 410 });
+    try {
+      const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
+      if (presignedUrl) {
+        downloadUrl = presignedUrl;
+        console.log(`API: 成功生成预签名URL`);
       } else {
-        console.log(`API: 找到分享文件: ${shareId}, 文件: ${shareInfo.fileId}.wav, 大小: ${fs.statSync(filePath).size} bytes`);
+        console.warn(`API: 无法生成预签名URL，使用API回退URL`);
       }
+    } catch (error) {
+      console.error(`API: 生成预签名URL失败:`, error);
     }
     
     // 计算剩余有效时间（以分钟为单位）
