@@ -591,110 +591,179 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 获取转换后的文件
+// 获取转换结果
 export async function GET(request: NextRequest) {
+  // 获取fileId参数
+  const fileId = request.nextUrl.searchParams.get('fileId');
+  const isCheckOnly = request.nextUrl.searchParams.get('check') === 'true';
+  const isRebuild = request.nextUrl.searchParams.get('rebuild') === 'true';
+  const requestId = request.headers.get('x-request-id') || `convert-dl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
+  console.log(`[API:convert:${requestId}] 接收到获取转换结果请求: fileId=${fileId}, check=${isCheckOnly}, rebuild=${isRebuild}`);
+  
+  if (!fileId) {
+    console.log(`[API:convert:${requestId}] 缺少fileId参数`);
+    return NextResponse.json({ error: 'Missing fileId parameter' }, { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const fileId = searchParams.get('fileId');
+    const filePath = path.join(TMP_DIR, `${fileId}.wav`);
     
-    if (!fileId) {
-      return NextResponse.json({ error: 'Missing file ID parameter' }, { status: 400 });
-    }
+    // 记录详细的检查过程
+    console.log(`[API:convert:${requestId}] 检查文件路径: ${filePath}`);
+    console.log(`[API:convert:${requestId}] TMP_DIR存在: ${fs.existsSync(TMP_DIR)}`);
     
-    console.log(`请求下载文件: fileId=${fileId}`);
+    let fileExists = fs.existsSync(filePath);
+    let fileInR2 = false;
     
-    let fileBuffer: Buffer | null = null;
-    const r2Key = `wav/${fileId}.wav`;
-    let fileSource = 'unknown';
-    
-    // 首先尝试从R2获取文件
+    // 检查文件是否存在于R2
     if (isR2Configured) {
       try {
-        console.log(`尝试从R2获取文件: ${r2Key}`);
-        
-        // 验证R2连接
-        const isConnected = await validateR2Connection();
-        if (!isConnected) {
-          console.warn('R2连接测试失败，将尝试从本地获取文件');
-        } else {
-          // 检查文件是否存在于R2
-          const fileExists = await fileExistsInR2(r2Key);
-          
-          if (fileExists) {
-            console.log(`文件在R2中存在: ${r2Key}`);
-            fileBuffer = await downloadFromR2(r2Key);
-            
-            if (fileBuffer) {
-              console.log(`成功从R2下载文件: ${r2Key}, 大小: ${fileBuffer.length}字节`);
-              fileSource = 'r2';
-            } else {
-              console.error(`从R2下载文件失败: ${r2Key}`);
-            }
-          } else {
-            console.log(`文件在R2中不存在: ${r2Key}`);
-          }
-        }
+        fileInR2 = await fileExistsInR2(`wav/${fileId}.wav`);
+        console.log(`[API:convert:${requestId}] 文件在R2中存在: ${fileInR2}`);
       } catch (r2Error) {
-        console.error(`R2操作出错:`, r2Error);
+        console.warn(`[API:convert:${requestId}] 检查R2文件时出错:`, r2Error);
       }
-    } else {
-      console.log('R2未配置，将从本地获取文件');
     }
     
-    // 如果R2不可用或文件不存在于R2，尝试从本地获取
-    if (!fileBuffer) {
-      const localPath = path.join(TMP_DIR, `${fileId}.wav`);
-      console.log(`尝试从本地获取文件: ${localPath}`);
+    // 如果只是检查模式，返回文件存在状态
+    if (isCheckOnly) {
+      console.log(`[API:convert:${requestId}] 检查模式: 本地=${fileExists}, R2=${fileInR2}`);
       
-      if (!fs.existsSync(localPath)) {
-        console.error(`文件不存在于本地: ${localPath}`);
+      if (fileExists || fileInR2) {
         return NextResponse.json({ 
-          error: 'File not found', 
-          details: 'The requested file does not exist in storage'
+          exists: true, 
+          local: fileExists,
+          r2: fileInR2,
+          fileId,
+          requestId,
+          timestamp: Date.now()
+        });
+      } else {
+        return NextResponse.json({ 
+          exists: false, 
+          error: 'File not found',
+          local: false,
+          r2: false,
+          fileId,
+          requestId,
+          timestamp: Date.now()
         }, { status: 404 });
       }
+    }
+    
+    if (!fileExists) {
+      console.log(`[API:convert:${requestId}] 本地文件不存在: ${filePath}`);
       
-      try {
-        fileBuffer = fs.readFileSync(localPath);
-        const stats = fs.statSync(localPath);
-        console.log(`成功从本地读取文件: ${localPath}, 大小: ${fileBuffer.length}字节, 创建时间: ${stats.birthtime}`);
-        fileSource = 'local';
-      } catch (fsError) {
-        console.error(`读取本地文件失败: ${localPath}`, fsError);
+      // 如果R2已配置，尝试从R2下载
+      if (isR2Configured && fileInR2) {
+        console.log(`[API:convert:${requestId}] 文件在R2中存在，尝试下载`);
+        
+        // 确保TMP_DIR存在
+        if (!fs.existsSync(TMP_DIR)) {
+          fs.mkdirSync(TMP_DIR, { recursive: true });
+          console.log(`[API:convert:${requestId}] 创建临时目录: ${TMP_DIR}`);
+        }
+        
+        // 从R2下载文件
+        const fileBuffer = await downloadFromR2(`wav/${fileId}.wav`);
+        
+        if (fileBuffer) {
+          // 将文件保存到本地
+          fs.writeFileSync(filePath, fileBuffer);
+          console.log(`[API:convert:${requestId}] 文件已从R2下载并保存到本地: ${filePath}, 大小: ${fileBuffer.length} 字节`);
+          fileExists = true;
+        } else {
+          console.log(`[API:convert:${requestId}] 无法从R2下载文件`);
+          fileInR2 = false;
+        }
+      }
+      
+      // 如果文件仍然不存在，返回错误
+      if (!fileExists && !fileInR2) {
+        console.log(`[API:convert:${requestId}] 文件在R2和本地都不存在: wav/${fileId}.wav`);
         return NextResponse.json({ 
-          error: 'File read error', 
-          details: fsError instanceof Error ? fsError.message : String(fsError)
-        }, { status: 500 });
+          error: 'File not found', 
+          detail: 'The requested file could not be found in any storage',
+          fileId,
+          local: false,
+          r2: false,
+          requestId,
+          timestamp: Date.now()
+        }, { status: 404 });
       }
     }
     
-    if (!fileBuffer) {
-      console.error(`无法获取文件内容: fileId=${fileId}`);
-      return NextResponse.json({ 
-        error: 'File content unavailable', 
-        details: 'Could not retrieve file content from any storage'
-      }, { status: 500 });
+    console.log(`[API:convert:${requestId}] 文件存在，准备发送: ${filePath}`);
+    
+    // 如果R2已配置，确保文件同时存在于R2
+    if (isR2Configured && !fileInR2 && fileExists) {
+      try {
+        console.log(`[API:convert:${requestId}] 文件不在R2中，尝试上传`);
+        
+        // 读取文件并上传到R2
+        const fileBuffer = fs.readFileSync(filePath);
+        const uploadSuccess = await uploadToR2(
+          `wav/${fileId}.wav`,
+          fileBuffer,
+          {
+            'source': 'local-file',
+            'request-id': requestId,
+            'rebuild': isRebuild ? 'true' : 'false'
+          },
+          'audio/wav'
+        );
+        
+        if (uploadSuccess) {
+          console.log(`[API:convert:${requestId}] 文件已成功上传到R2`);
+          fileInR2 = true;
+        } else {
+          console.warn(`[API:convert:${requestId}] 上传文件到R2失败，但仍将继续发送本地文件`);
+        }
+      } catch (r2Error) {
+        console.warn(`[API:convert:${requestId}] 上传到R2时出错:`, r2Error);
+      }
     }
     
-    console.log(`文件下载成功: fileId=${fileId}, 来源=${fileSource}, 大小=${fileBuffer.length}字节`);
+    // 获取文件信息
+    const stat = fs.statSync(filePath);
+    console.log(`[API:convert:${requestId}] 文件大小: ${stat.size} 字节`);
     
-    // 返回文件并添加CORS和缓存控制头部
-    return new NextResponse(fileBuffer, {
+    // 如果是重建模式，只返回成功状态而不是文件内容
+    if (isRebuild) {
+      return NextResponse.json({ 
+        success: true,
+        message: 'File rebuild completed successfully',
+        fileId,
+        size: stat.size,
+        local: fileExists,
+        r2: fileInR2,
+        requestId,
+        timestamp: Date.now()
+      });
+    }
+    
+    // 使用streams发送大文件
+    const stream = fs.createReadStream(filePath);
+    
+    // 返回文件
+    return new NextResponse(stream, {
       headers: {
         'Content-Type': 'audio/wav',
         'Content-Disposition': `attachment; filename="${fileId}.wav"`,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Cache-Control': 'public, max-age=86400',
-        'X-File-Source': fileSource
+        'Content-Length': stat.size.toString(),
+        'Cache-Control': 'no-cache',
+        'x-request-id': requestId
       }
     });
   } catch (error) {
-    console.error('获取文件错误:', error);
+    console.error(`[API:convert:${requestId}] 获取转换结果出错:`, error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      detail: error instanceof Error ? error.message : 'Unknown error',
+      fileId,
+      requestId,
+      timestamp: Date.now()
     }, { status: 500 });
   }
 }
