@@ -313,22 +313,48 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const requestId = request.headers.get('x-request-id') || `get-share-${Date.now()}`;
   const isDebug = request.headers.get('x-debug') === 'true';
+  const isClient = request.headers.get('x-client') === 'browser';
+  const isForceFetch = request.nextUrl.searchParams.get('force') === 'true';
   
   try {
     const shareId = request.nextUrl.searchParams.get('id');
     
-    console.log(`[API:share:${requestId}] 接收到获取分享请求: id=${shareId}, debug=${isDebug}`);
+    console.log(`[API:share:${requestId}] 接收到获取分享请求: id=${shareId}, debug=${isDebug}, client=${isClient}, force=${isForceFetch}`);
     
     if (!shareId) {
       console.log(`[API:share:${requestId}] API请求缺少share ID参数`);
       return NextResponse.json({ 
         error: 'Missing share ID',
-        requestId
+        requestId,
+        timestamp: new Date().toISOString(),
+        url: request.url,
+        isDebug,
+        isClient
       }, { status: 400 });
     }
     
+    // 记录完整的请求信息用于调试
+    if (isDebug) {
+      const headers: Record<string, string> = {};
+      request.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      console.log(`[API:share:${requestId}] 请求详情:`, {
+        url: request.url,
+        method: request.method,
+        headers: headers,
+        params: Object.fromEntries(request.nextUrl.searchParams.entries()),
+      });
+    }
+    
     // 首先从内存缓存中获取
-    let shareInfo = sharesCache.get(shareId);
+    let shareInfo: ShareInfo | undefined = sharesCache.get(shareId);
+    
+    // 如果设置了force参数或在客户端模式下，尝试直接访问文件系统和R2
+    if (isForceFetch || isClient) {
+      console.log(`[API:share:${requestId}] 强制模式或客户端请求，绕过缓存`);
+      shareInfo = undefined; // 清除缓存结果，强制重新获取
+    }
     
     // 如果不在缓存中，从R2加载
     if (!shareInfo) {
@@ -338,11 +364,34 @@ export async function GET(request: NextRequest) {
       // 修复TypeScript问题，明确检查null
       if (loadedInfo === null) {
         console.log(`[API:share:${requestId}] R2中也未找到分享`);
+        
+        // 添加服务器环境信息用于诊断
+        const envDebugInfo = isDebug ? {
+          serverEnv: {
+            cwd: process.cwd(),
+            tmpExists: fs.existsSync(TMP_DIR),
+            sharesExists: fs.existsSync(path.join(TMP_DIR, 'shares')),
+            r2Configured: isR2Configured,
+            nodeEnv: process.env.NODE_ENV,
+            platform: process.platform,
+            timestamp: Date.now()
+          }
+        } : {};
+        
         return NextResponse.json({ 
           error: 'Share not found or expired',
           detail: 'The requested share link could not be found in our system',
-          requestId
-        }, { status: 404 });
+          requestId,
+          timestamp: new Date().toISOString(),
+          ...envDebugInfo
+        }, { 
+          status: 404,
+          headers: {
+            'x-debug-info': 'share-not-found',
+            'x-request-id': requestId,
+            'x-timestamp': Date.now().toString()
+          }
+        });
       }
       
       shareInfo = loadedInfo;
@@ -361,8 +410,15 @@ export async function GET(request: NextRequest) {
         expiresAt: new Date(shareInfo.expiresAt).toISOString(),
         currentTime: new Date().toISOString(),
         detail: 'The share link has expired. Shares are available for 24 hours after creation.',
-        requestId
-      }, { status: 410 });
+        requestId,
+        timestamp: Date.now()
+      }, { 
+        status: 410,
+        headers: {
+          'x-debug-info': 'share-expired',
+          'x-request-id': requestId
+        }
+      });
     }
     
     // 生成R2预签名URL
@@ -370,12 +426,51 @@ export async function GET(request: NextRequest) {
     let downloadUrl = `/api/convert?fileId=${shareInfo.fileId}`;
     
     try {
-      const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
-      if (presignedUrl) {
-        downloadUrl = presignedUrl;
-        console.log(`[API:share:${requestId}] 成功生成预签名URL`);
+      // 检查文件是否存在于R2
+      let fileInR2 = false;
+      if (isR2Configured) {
+        try {
+          fileInR2 = await fileExistsInR2(`wav/${shareInfo.fileId}.wav`);
+          console.log(`[API:share:${requestId}] 文件在R2中存在检查结果: ${fileInR2}`);
+        } catch (r2Error) {
+          console.error(`[API:share:${requestId}] 检查R2文件时出错:`, r2Error);
+        }
+      }
+      
+      // 检查文件是否存在于本地文件系统
+      let fileInLocal = false;
+      try {
+        const localFilePath = path.join(TMP_DIR, `${shareInfo.fileId}.wav`);
+        fileInLocal = fs.existsSync(localFilePath);
+        console.log(`[API:share:${requestId}] 文件在本地文件系统中存在检查结果: ${fileInLocal}, 路径: ${localFilePath}`);
+      } catch (fsError) {
+        console.error(`[API:share:${requestId}] 检查本地文件时出错:`, fsError);
+      }
+      
+      // 记录存储状态
+      console.log(`[API:share:${requestId}] 文件存储状态: R2=${fileInR2}, 本地=${fileInLocal}`);
+      
+      if (!fileInR2 && !fileInLocal) {
+        console.error(`[API:share:${requestId}] 文件在R2和本地都不存在: fileId=${shareInfo.fileId}`);
+        return NextResponse.json({ 
+          error: 'File not found',
+          detail: 'The file associated with this share link could not be found in storage',
+          fileId: shareInfo.fileId,
+          requestId,
+          storage: { r2: fileInR2, local: fileInLocal }
+        }, { status: 404 });
+      }
+      
+      if (fileInR2) {
+        const presignedUrl = await generatePresignedUrl(`wav/${shareInfo.fileId}.wav`);
+        if (presignedUrl) {
+          downloadUrl = presignedUrl;
+          console.log(`[API:share:${requestId}] 成功生成预签名URL`);
+        } else {
+          console.warn(`[API:share:${requestId}] 无法生成预签名URL，使用API回退URL`);
+        }
       } else {
-        console.warn(`[API:share:${requestId}] 无法生成预签名URL，使用API回退URL`);
+        console.log(`[API:share:${requestId}] R2文件不存在，使用API回退URL`);
       }
     } catch (error) {
       console.error(`[API:share:${requestId}] 生成预签名URL失败:`, error);
@@ -393,7 +488,10 @@ export async function GET(request: NextRequest) {
         cacheHit: !!sharesCache.get(shareId),
         r2Available: isR2Configured,
         requestId,
-        serverTime: new Date().toISOString()
+        serverTime: new Date().toISOString(),
+        client: isClient,
+        path: request.nextUrl.pathname + request.nextUrl.search,
+        referer: request.headers.get('referer') || 'none'
       }
     } : {};
     
@@ -405,14 +503,23 @@ export async function GET(request: NextRequest) {
       createdAt: new Date(shareInfo.createdAt).toISOString(),
       expiresAt: new Date(shareInfo.expiresAt).toISOString(),
       remainingMinutes: remainingMinutes,
+      timestamp: Date.now(),
       ...debugInfo
+    }, {
+      headers: {
+        'x-request-id': requestId,
+        'x-timestamp': Date.now().toString(),
+        'Cache-Control': 'no-store, max-age=0'
+      }
     });
   } catch (error: any) {
     console.error(`[API:share:${requestId}] 获取分享信息错误:`, error);
     return NextResponse.json({ 
       error: 'Failed to retrieve share information',
       detail: error.message || 'An unknown error occurred',
-      requestId
+      requestId,
+      timestamp: Date.now(),
+      stack: isDebug ? error.stack : undefined
     }, { status: 500 });
   }
 }

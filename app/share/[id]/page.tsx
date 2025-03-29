@@ -6,23 +6,24 @@ import { SiteHeader } from "@/components/site-header"
 import fs from 'fs';
 import path from 'path';
 
-// 客户端调试标志 - 在URL中添加?debug=true启用
-const CLIENT_DEBUG = typeof window !== 'undefined' && 
-  (window.location.search.includes('debug=true') || localStorage.getItem('debug') === 'true');
+// 始终启用客户端调试 - 临时修改，便于排查问题
+const CLIENT_DEBUG = true;
 
 // 客户端日志函数
 function clientLog(...args: any[]) {
   if (typeof window !== 'undefined') {
     console.log('[SHARE CLIENT]', ...args);
-    // 如果启用了调试，将日志添加到页面上的调试区域
-    if (CLIENT_DEBUG && document.getElementById('debug-log')) {
-      const logElem = document.getElementById('debug-log');
-      if (logElem) {
-        const time = new Date().toISOString().split('T')[1].split('.')[0];
-        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-        logElem.innerHTML += `<div>${time}: ${msg}</div>`;
+    // 将日志添加到页面上的调试区域
+    setTimeout(() => {
+      if (document.getElementById('debug-log')) {
+        const logElem = document.getElementById('debug-log');
+        if (logElem) {
+          const time = new Date().toISOString().split('T')[1].split('.')[0];
+          const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+          logElem.innerHTML += `<div>${time}: ${msg}</div>`;
+        }
       }
-    }
+    }, 0);
   }
 }
 
@@ -246,22 +247,34 @@ async function getShareData(id: string) {
   }
 }
 
-// 客户端调试组件
+// 客户端调试组件 - 始终显示
 function DebugPanel({ data }: { data: any }) {
-  if (!CLIENT_DEBUG) return null;
-  
   return (
     <div className="mt-8 p-4 border border-gray-300 rounded bg-gray-50 text-xs font-mono">
-      <h3 className="font-bold mb-2">调试信息</h3>
+      <h3 className="font-bold mb-2">调试信息 (当前时间: {new Date().toISOString()})</h3>
       <div className="mb-4">
-        <div><strong>URL:</strong> {typeof window !== 'undefined' ? window.location.href : ''}</div>
+        <div><strong>URL:</strong> {typeof window !== 'undefined' ? window.location.href : '服务器端'}</div>
         <div><strong>ShareID:</strong> {data?.params?.id || 'N/A'}</div>
         <div><strong>Error:</strong> {data?.error || 'none'}</div>
         <div><strong>Success:</strong> {data?.success ? 'true' : 'false'}</div>
         {data.details && <div><strong>Details:</strong> {data.details}</div>}
+        {data.message && <div><strong>Message:</strong> {data.message}</div>}
       </div>
-      <div className="mb-2 font-bold">实时日志:</div>
-      <div id="debug-log" className="max-h-40 overflow-y-auto p-2 bg-black text-white"></div>
+      <div className="mb-2 font-bold">请求追踪:</div>
+      <div className="mb-4">
+        <div><strong>Server time:</strong> {data?.serverTime || 'unknown'}</div>
+        <div><strong>Request ID:</strong> {data?.requestId || 'unknown'}</div>
+        <div><strong>Storage:</strong> R2={data?.storage?.r2 ? 'true' : 'false'}, Local={data?.storage?.local ? 'true' : 'false'}</div>
+      </div>
+      <div className="mb-2 font-bold">实时客户端日志:</div>
+      <div id="debug-log" className="max-h-60 overflow-y-auto p-2 bg-black text-white text-xs">
+        <div>{new Date().toISOString()}: 调试面板已加载</div>
+      </div>
+      <div className="mt-2">
+        <a href={`/api/test-share?id=${data?.params?.id || ''}`} target="_blank" className="text-blue-500 hover:underline">
+          查看完整存储状态
+        </a>
+      </div>
     </div>
   );
 }
@@ -399,25 +412,42 @@ export default async function SharePage({ params }: { params: { id: string } }) 
             </CardContent>
           </Card>
           
-          <DebugPanel data={{ params, ...shareData }} />
+          <DebugPanel data={{ 
+            params, 
+            ...shareData, 
+            serverTime: new Date().toISOString(),
+            clientTime: typeof window !== 'undefined' ? new Date().toISOString() : null,
+            userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+          }} />
           
-          {/* 添加检查存储按钮 - 仅在开发或调试模式下显示 */}
-          {CLIENT_DEBUG && (
-            <div className="mt-4 text-center">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    clientLog('正在手动检查存储...');
-                    window.location.href = `/api/share?id=${params.id}&debug=true&force=true&_=${Date.now()}`;
-                  }
-                }}
-              >
-                检查存储状态
-              </Button>
-            </div>
-          )}
+          {/* 添加直接检查按钮 */}
+          <div className="mt-4 text-center">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  clientLog('正在手动检查存储...');
+                  window.location.href = `/api/test-share?id=${params.id}&fileId=${shareData?.fileId || ''}&_=${Date.now()}`;
+                }
+              }}
+            >
+              检查存储状态
+            </Button>
+            {' '}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  clientLog('正在强制刷新分享...');
+                  window.location.href = `/api/share?id=${params.id}&debug=true&force=true&_=${Date.now()}`;
+                }
+              }}
+            >
+              强制刷新分享
+            </Button>
+          </div>
         </div>
       </main>
     </>
@@ -436,15 +466,27 @@ export function generateMetadata({ params }: { params: { id: string }}) {
         type: 'text/javascript',
         dangerouslySetInnerHTML: {
           __html: `
-            console.log('[SHARE CLIENT] 页面加载, shareId=${params.id}');
+            console.log('[SHARE CLIENT] 页面加载, shareId=${params.id}, 时间=${new Date().toISOString()}');
+            window.addEventListener('DOMContentLoaded', function() {
+              console.log('[SHARE CLIENT] DOM内容加载完成, 时间=${new Date().toISOString()}');
+            });
+            
             window.addEventListener('load', function() {
-              console.log('[SHARE CLIENT] 页面完全加载');
+              console.log('[SHARE CLIENT] 页面完全加载, 时间=${new Date().toISOString()}');
               
-              // 如果URL中有debug参数，存储debug状态
-              if (window.location.search.includes('debug=true')) {
-                localStorage.setItem('debug', 'true');
-                console.log('[SHARE CLIENT] 调试模式已启用');
+              // 记录当前URL和参数
+              const url = new URL(window.location.href);
+              const params = {};
+              for (const [key, value] of url.searchParams.entries()) {
+                params[key] = value;
               }
+              console.log('[SHARE CLIENT] URL信息:', {
+                href: window.location.href,
+                origin: window.location.origin,
+                pathname: window.location.pathname,
+                search: window.location.search,
+                params: params
+              });
               
               // 添加错误日志
               window.addEventListener('error', function(e) {
@@ -454,6 +496,34 @@ export function generateMetadata({ params }: { params: { id: string }}) {
                     '<div style="color:red">错误: ' + e.message + '</div>';
                 }
               });
+              
+              // 添加网络请求日志
+              const originalFetch = window.fetch;
+              window.fetch = function(...args) {
+                const url = args[0];
+                console.log('[SHARE CLIENT] 发起网络请求:', url);
+                if (document.getElementById('debug-log')) {
+                  document.getElementById('debug-log').innerHTML += 
+                    '<div>网络请求: ' + url + '</div>';
+                }
+                return originalFetch.apply(this, args)
+                  .then(response => {
+                    console.log('[SHARE CLIENT] 网络响应:', url, response.status);
+                    if (document.getElementById('debug-log')) {
+                      document.getElementById('debug-log').innerHTML += 
+                        '<div>网络响应: ' + url + ' - ' + response.status + '</div>';
+                    }
+                    return response;
+                  })
+                  .catch(error => {
+                    console.error('[SHARE CLIENT] 网络错误:', url, error);
+                    if (document.getElementById('debug-log')) {
+                      document.getElementById('debug-log').innerHTML += 
+                        '<div style="color:red">网络错误: ' + url + ' - ' + error.message + '</div>';
+                    }
+                    throw error;
+                  });
+              };
             });
           `
         }

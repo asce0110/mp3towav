@@ -329,4 +329,30 @@ export async function listFilesInR2(prefix?: string): Promise<string[]> {
     console.error(`列出 R2 文件失败:`, error);
     return [];
   }
+}
+
+// 列出R2存储桶中的对象
+export async function listR2Objects(prefix: string, limit: number = 100): Promise<Array<{ key: string, size: number, lastModified: string }>> {
+  if (!r2Client) {
+    console.error('R2 client not initialized');
+    return [];
+  }
+  
+  try {
+    const options = { prefix, limit };
+    const objects = await r2Client.list(options);
+    
+    if (!objects || !objects.objects) {
+      return [];
+    }
+    
+    return objects.objects.map(obj => ({
+      key: obj.key,
+      size: obj.size,
+      lastModified: obj.uploaded.toISOString()
+    }));
+  } catch (error) {
+    console.error('Error listing R2 objects:', error);
+    return [];
+  }
 } 

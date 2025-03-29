@@ -19,7 +19,7 @@ async function checkDirectoryStatus(dir: string) {
     let stats = null;
     let writable = false;
     let readable = false;
-    let files = [];
+    let files: string[] = [];
     
     if (exists) {
       stats = fs.statSync(dir);
