@@ -6,6 +6,26 @@ import { SiteHeader } from "@/components/site-header"
 import fs from 'fs';
 import path from 'path';
 
+// 客户端调试标志 - 在URL中添加?debug=true启用
+const CLIENT_DEBUG = typeof window !== 'undefined' && 
+  (window.location.search.includes('debug=true') || localStorage.getItem('debug') === 'true');
+
+// 客户端日志函数
+function clientLog(...args: any[]) {
+  if (typeof window !== 'undefined') {
+    console.log('[SHARE CLIENT]', ...args);
+    // 如果启用了调试，将日志添加到页面上的调试区域
+    if (CLIENT_DEBUG && document.getElementById('debug-log')) {
+      const logElem = document.getElementById('debug-log');
+      if (logElem) {
+        const time = new Date().toISOString().split('T')[1].split('.')[0];
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        logElem.innerHTML += `<div>${time}: ${msg}</div>`;
+      }
+    }
+  }
+}
+
 // 临时文件和分享信息存储目录
 const TMP_DIR = path.join(process.cwd(), 'tmp');
 const SHARES_DIR = path.join(TMP_DIR, 'shares');
@@ -135,8 +155,8 @@ async function getShareData(id: string) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
                    (process.env.NODE_ENV === 'production' ? 'https://mp3towav.net' : 'http://localhost:3000');
     
-    // 构建完整的API URL
-    const apiUrl = `${baseUrl}/api/share?id=${id}`;
+    // 构建完整的API URL - 添加调试参数
+    const apiUrl = `${baseUrl}/api/share?id=${id}&_t=${Date.now()}&browser=true`;
     console.log(`[分享页面] API请求URL: ${apiUrl}`);
     
     // 使用服务端fetch获取分享数据，添加详细日志
@@ -147,7 +167,8 @@ async function getShareData(id: string) {
         cache: 'no-store',
         headers: {
           'x-debug': 'true',
-          'x-request-id': `share-page-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
+          'x-request-id': `share-page-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+          'x-client': 'browser'
         }
       });
       
@@ -225,6 +246,26 @@ async function getShareData(id: string) {
   }
 }
 
+// 客户端调试组件
+function DebugPanel({ data }: { data: any }) {
+  if (!CLIENT_DEBUG) return null;
+  
+  return (
+    <div className="mt-8 p-4 border border-gray-300 rounded bg-gray-50 text-xs font-mono">
+      <h3 className="font-bold mb-2">调试信息</h3>
+      <div className="mb-4">
+        <div><strong>URL:</strong> {typeof window !== 'undefined' ? window.location.href : ''}</div>
+        <div><strong>ShareID:</strong> {data?.params?.id || 'N/A'}</div>
+        <div><strong>Error:</strong> {data?.error || 'none'}</div>
+        <div><strong>Success:</strong> {data?.success ? 'true' : 'false'}</div>
+        {data.details && <div><strong>Details:</strong> {data.details}</div>}
+      </div>
+      <div className="mb-2 font-bold">实时日志:</div>
+      <div id="debug-log" className="max-h-40 overflow-y-auto p-2 bg-black text-white"></div>
+    </div>
+  );
+}
+
 export default async function SharePage({ params }: { params: { id: string } }) {
   console.log(`[分享页面] 开始渲染分享页面: ID=${params.id}, 类型=${typeof params.id}, 长度=${params.id?.length || 0}`);
   
@@ -260,6 +301,7 @@ export default async function SharePage({ params }: { params: { id: string } }) 
                 </div>
               </CardContent>
             </Card>
+            <DebugPanel data={{ params, error: 'invalid_format', success: false }} />
           </div>
         </main>
       </>
@@ -356,8 +398,66 @@ export default async function SharePage({ params }: { params: { id: string } }) 
               )}
             </CardContent>
           </Card>
+          
+          <DebugPanel data={{ params, ...shareData }} />
+          
+          {/* 添加检查存储按钮 - 仅在开发或调试模式下显示 */}
+          {CLIENT_DEBUG && (
+            <div className="mt-4 text-center">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    clientLog('正在手动检查存储...');
+                    window.location.href = `/api/share?id=${params.id}&debug=true&force=true&_=${Date.now()}`;
+                  }
+                }}
+              >
+                检查存储状态
+              </Button>
+            </div>
+          )}
         </div>
       </main>
     </>
   );
+}
+
+// 添加客户端脚本，会在页面加载时执行
+export function generateMetadata({ params }: { params: { id: string }}) {
+  return {
+    title: `Shared File - ${params.id}`,
+    description: 'Access your shared WAV file',
+    // 添加客户端脚本
+    script: [
+      {
+        id: 'share-debug-script',
+        type: 'text/javascript',
+        dangerouslySetInnerHTML: {
+          __html: `
+            console.log('[SHARE CLIENT] 页面加载, shareId=${params.id}');
+            window.addEventListener('load', function() {
+              console.log('[SHARE CLIENT] 页面完全加载');
+              
+              // 如果URL中有debug参数，存储debug状态
+              if (window.location.search.includes('debug=true')) {
+                localStorage.setItem('debug', 'true');
+                console.log('[SHARE CLIENT] 调试模式已启用');
+              }
+              
+              // 添加错误日志
+              window.addEventListener('error', function(e) {
+                console.error('[SHARE CLIENT ERROR]', e.message, e.filename, e.lineno);
+                if (document.getElementById('debug-log')) {
+                  document.getElementById('debug-log').innerHTML += 
+                    '<div style="color:red">错误: ' + e.message + '</div>';
+                }
+              });
+            });
+          `
+        }
+      }
+    ]
+  };
 } 

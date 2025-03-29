@@ -366,6 +366,7 @@ export function MP3toWAVConverter() {
   const [mediaSource, setMediaSource] = useState<MediaElementAudioSourceNode | null>(null)
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSharing, setIsSharing] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -992,28 +993,19 @@ export function MP3toWAVConverter() {
   const handleDownload = () => {
     if (!downloadUrl) return;
     
-    // 使用直接下载的方式而不是通过页面跳转
-    try {
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = (originalName || 'converted.wav').replace(/\.mp3$/i, '.wav');
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      // 显示成功提示
-      toast({
-        title: "下载已开始",
-        description: "WAV文件正在下载中，请稍候。",
-      });
-    } catch (error) {
-      console.error('下载错误:', error);
-      toast({
-        title: "下载失败",
-        description: "无法下载文件，请稍后再试。",
-        variant: "destructive",
-      });
-    }
+    // 生成唯一ID
+    const downloadId = generateUniqueId();
+    
+    // 存储下载信息到sessionStorage
+    const downloadData = {
+      fileName: originalName || 'converted.wav',
+      url: downloadUrl
+    };
+    
+    sessionStorage.setItem(`download_${downloadId}`, JSON.stringify(downloadData));
+    
+    // 跳转到下载页面
+    window.location.href = `/download/${downloadId}`;
   };
   
   // 生成唯一ID的辅助函数
@@ -1023,43 +1015,95 @@ export function MP3toWAVConverter() {
 
   // 修改分享功能，跳转到分享页面并填充链接
   const handleShare = async () => {
-    if (!downloadUrl) {
-      toast({
-        title: "Error",
-        description: "Please convert a file first before sharing.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // 确保有fileId
-    if (!fileId) {
-      toast({
-        title: "Error",
-        description: "File ID is missing. Please try converting again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      // 输出调试信息
-      console.log('Sharing file with ID:', fileId);
+      if (!fileId) {
+        console.error('No fileId available for sharing');
+        toast({
+          title: "Share failed",
+          description: "No file available to share. Please convert a file first.",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      // 创建完整的分享链接
-      const origin = window.location.origin;
-      const fullShareUrl = `${origin}/share/${fileId}`;
+      setIsSharing(true);
+      console.log(`[分享] 开始创建分享链接: fileId=${fileId}, 原始文件名=${originalName || 'unknown'}`);
       
-      // 跳转到分享页面，传递分享链接作为url参数
-      window.location.href = `/share?url=${encodeURIComponent(fullShareUrl)}`;
+      const requestId = `share-req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       
+      // 标记开始时间用于性能监控
+      const startTime = Date.now();
+      
+      // 创建分享
+      try {
+        const response = await fetch('/api/share', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-request-id': requestId,
+            'x-debug': 'true'
+          },
+          body: JSON.stringify({
+            fileId,
+            originalName: originalName || `${fileId}.wav`,
+            clientTime: new Date().toISOString()
+          })
+        });
+        
+        console.log(`[分享] API响应状态: ${response.status}`);
+        
+        if (!response.ok) {
+          // 尝试读取错误消息
+          try {
+            const errorData = await response.json();
+            console.error(`[分享] API错误: ${JSON.stringify(errorData)}`);
+            throw new Error(errorData.error || `Server returned ${response.status}`);
+          } catch (e) {
+            console.error(`[分享] 无法解析API错误:`, e);
+            throw new Error(`API error: ${response.status}`);
+          }
+        }
+        
+        // 解析响应
+        const data = await response.json();
+        console.log(`[分享] 创建分享成功: shareId=${data.shareId}, 存储=${data.storageType || 'unknown'}, 耗时=${Date.now() - startTime}ms`);
+        
+        // 设置分享ID
+        setShareId(data.shareId);
+        
+        // 构建分享URL
+        const origin = window.location.origin;
+        const fullShareUrl = `${origin}/share/${data.shareId}`;
+        
+        console.log(`[分享] 重定向到分享页面: ${fullShareUrl}`);
+        
+        // 添加额外的调试信息用于跟踪
+        const debugInfo = encodeURIComponent(JSON.stringify({
+          time: Date.now(),
+          requestId,
+          fileId,
+          shareId: data.shareId
+        }));
+        
+        // 带调试信息重定向
+        window.location.href = `/share/${data.shareId}?_=${Date.now()}&src=direct`;
+      } catch (error) {
+        console.error('[分享] 创建分享错误:', error);
+        toast({
+          title: "Share failed",
+          description: error instanceof Error ? error.message : "Could not create share link. Please try again.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Share error:', error);
       toast({
         title: "Share failed",
         description: "Could not navigate to share page. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
+    } finally {
+      setIsSharing(false);
     }
   };
 
