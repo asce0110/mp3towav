@@ -24,7 +24,6 @@ const nextConfig = {
       bodySizeLimit: '500mb',
       timeLimit: 300, // 5分钟
     },
-    // 提高Cloudflare Worker兼容性
     modularizeImports: {
       'react-icons': {
         transform: 'react-icons/{{member}}',

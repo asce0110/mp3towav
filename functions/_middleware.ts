@@ -1,16 +1,23 @@
-export interface Context {
-  next: () => Promise<Response>;
+// 自定义Context接口，避免依赖@cloudflare/workers-types
+interface Context {
+  data: Record<string, any>;
   env: Record<string, any>;
+  next: () => Promise<Response>;
+  request: Request;
+  waitUntil: (promise: Promise<any>) => void;
 }
 
 export const onRequest = async (context: Context) => {
-  // 增加头部，允许更大的请求体
-  const response = await context.next();
-  
-  // 添加CORS头
-  response.headers.set("Access-Control-Allow-Origin", "*");
-  response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID");
-  
-  return response;
+  try {
+    const response = await context.next();
+    return response;
+  } catch (err) {
+    console.error('中间件捕获到错误:', err);
+    return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
 }; 
