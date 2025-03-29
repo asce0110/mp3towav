@@ -11,12 +11,22 @@ interface ShareInfo {
   expiresAt: number;
 }
 
-// 使用内存存储作为缓存，加快访问速度
+// 模拟数据库存储，使用内存缓存
 const sharesCache = new Map<string, ShareInfo>();
+
+// Vercel内部存储 - 服务器端组件共享此变量，但每次部署会重置
+let serverShares: Record<string, ShareInfo> = {};
 
 // 临时文件和分享信息存储目录
 const TMP_DIR = path.join(process.cwd(), 'tmp');
 const SHARES_DIR = path.join(TMP_DIR, 'shares');
+
+// 检查Vercel环境
+const isVercelEnv = process.env.VERCEL === '1';
+console.log(`当前环境: ${isVercelEnv ? 'Vercel' : '本地开发'}`);
+console.log(`当前工作目录: ${process.cwd()}`);
+console.log(`TMP_DIR 路径: ${TMP_DIR}`);
+console.log(`SHARES_DIR 路径: ${SHARES_DIR}`);
 
 // 在应用启动时确保目录存在
 function ensureDirectoriesExist() {
@@ -25,12 +35,54 @@ function ensureDirectoriesExist() {
     if (!fs.existsSync(TMP_DIR)) {
       fs.mkdirSync(TMP_DIR, { recursive: true });
       console.log(`创建临时目录: ${TMP_DIR}`);
+    } else {
+      console.log(`临时目录已存在: ${TMP_DIR}`);
+      try {
+        // 列出目录内容
+        const files = fs.readdirSync(TMP_DIR);
+        console.log(`TMP_DIR内容: ${files.length > 0 ? files.join(', ') : '空目录'}`);
+      } catch (e) {
+        console.error(`无法读取TMP_DIR内容:`, e);
+      }
     }
     
     // 确保分享信息目录存在
     if (!fs.existsSync(SHARES_DIR)) {
       fs.mkdirSync(SHARES_DIR, { recursive: true });
       console.log(`创建分享目录: ${SHARES_DIR}`);
+    } else {
+      console.log(`分享目录已存在: ${SHARES_DIR}`);
+      try {
+        // 列出目录内容
+        const files = fs.readdirSync(SHARES_DIR);
+        console.log(`SHARES_DIR内容: ${files.length > 0 ? files.join(', ') : '空目录'}`);
+      } catch (e) {
+        console.error(`无法读取SHARES_DIR内容:`, e);
+      }
+    }
+    
+    // 在Vercel环境做额外测试
+    if (isVercelEnv) {
+      console.log(`在Vercel环境进行目录写入测试`);
+      const testFile = path.join(TMP_DIR, '_test_write.txt');
+      try {
+        fs.writeFileSync(testFile, `Test file created at ${new Date().toISOString()}`);
+        console.log(`测试文件写入成功: ${testFile}`);
+        
+        // 验证文件存在
+        if (fs.existsSync(testFile)) {
+          const content = fs.readFileSync(testFile, 'utf8');
+          console.log(`测试文件内容: ${content.substring(0, 30)}...`);
+          
+          // 尝试删除测试文件
+          fs.unlinkSync(testFile);
+          console.log(`测试文件删除成功`);
+        } else {
+          console.error(`测试文件写入后无法验证存在: ${testFile}`);
+        }
+      } catch (e) {
+        console.error(`Vercel环境文件写入测试失败:`, e);
+      }
     }
   } catch (error) {
     console.error('创建必要目录失败:', error);
@@ -40,81 +92,111 @@ function ensureDirectoriesExist() {
 // 立即执行确保目录存在
 ensureDirectoriesExist();
 
-// 从文件系统加载分享信息
+// 从数据存储加载分享信息
 function loadShareInfo(shareId: string): ShareInfo | null {
+  console.log(`尝试加载分享信息: ${shareId}`);
+  
+  // 首先从内存缓存检查
+  if (sharesCache.has(shareId)) {
+    console.log(`从内存缓存加载分享: ${shareId}`);
+    return sharesCache.get(shareId) || null;
+  }
+  
+  // 然后从服务器变量检查
+  if (serverShares[shareId]) {
+    console.log(`从服务器变量加载分享: ${shareId}`);
+    const shareInfo = serverShares[shareId];
+    // 更新内存缓存
+    sharesCache.set(shareId, shareInfo);
+    return shareInfo;
+  }
+  
+  // 最后从文件系统检查
   try {
+    console.log(`尝试从文件系统加载分享: ${shareId}`);
     const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
     if (!fs.existsSync(sharePath)) {
+      console.log(`文件系统中不存在分享文件: ${sharePath}`);
       return null;
     }
     
     const shareData = fs.readFileSync(sharePath, 'utf-8');
-    const shareInfo = JSON.parse(shareData) as ShareInfo;
+    console.log(`已读取分享文件内容: ${shareData.substring(0, 50)}...`);
     
-    // 缓存到内存
-    sharesCache.set(shareId, shareInfo);
-    
-    return shareInfo;
+    try {
+      const shareInfo = JSON.parse(shareData) as ShareInfo;
+      
+      // 更新缓存
+      sharesCache.set(shareId, shareInfo);
+      serverShares[shareId] = shareInfo;
+      
+      console.log(`成功从文件加载并解析分享: ${shareId}`);
+      return shareInfo;
+    } catch (parseError) {
+      console.error(`解析分享JSON失败: ${shareId}`, parseError);
+      return null;
+    }
   } catch (error) {
-    console.error(`Error loading share info for ${shareId}:`, error);
+    console.error(`从文件系统加载分享失败: ${shareId}`, error);
     return null;
   }
 }
 
-// 保存分享信息到文件系统
+// 保存分享信息到存储
 function saveShareInfo(shareId: string, shareInfo: ShareInfo) {
+  console.log(`正在保存分享信息: ${shareId}`);
+  
+  // 同时保存到所有存储位置
+  
+  // 1. 内存缓存
+  sharesCache.set(shareId, shareInfo);
+  
+  // 2. 服务器变量
+  serverShares[shareId] = shareInfo;
+  console.log(`分享已保存到服务器变量: ${shareId}`);
+  
+  // 3. 文件系统 (尽最大努力，但可能在Vercel上不可靠)
   try {
-    // 确保目录存在
     ensureDirectoriesExist();
     
     const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
     const shareData = JSON.stringify(shareInfo);
     
-    // 尝试保存文件
-    console.log(`尝试保存分享信息到: ${sharePath}`);
+    console.log(`尝试保存分享到文件: ${sharePath}`);
     fs.writeFileSync(sharePath, shareData, 'utf-8');
     
-    // 验证文件是否成功保存
     if (fs.existsSync(sharePath)) {
-      const stats = fs.statSync(sharePath);
-      console.log(`分享信息已保存: ${sharePath}, 大小: ${stats.size} bytes`);
-      
-      // 添加到内存缓存
-      sharesCache.set(shareId, shareInfo);
-      return true;
+      console.log(`分享文件已成功写入: ${sharePath}`);
     } else {
-      console.error(`保存分享信息失败: 文件未创建 ${sharePath}`);
-      throw new Error('Failed to verify saved share file');
+      console.warn(`分享文件写入后无法验证存在: ${sharePath}`);
     }
   } catch (error) {
-    console.error(`保存分享信息到 ${shareId} 失败:`, error);
-    // 尝试使用同步API重试一次
-    try {
-      console.log(`尝试使用备用方法重新保存...`);
-      const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
-      const shareData = JSON.stringify(shareInfo);
-      fs.writeFileSync(sharePath, shareData);
-      console.log(`使用备用方法保存成功: ${sharePath}`);
-      sharesCache.set(shareId, shareInfo);
-      return true;
-    } catch (retryError) {
-      console.error(`重试保存失败:`, retryError);
-      throw error; // 抛出原始错误
-    }
+    console.warn(`保存分享到文件系统失败 (非致命错误): ${shareId}`, error);
+    // 不抛出错误，因为我们仍然有内存缓存和服务器变量
   }
+  
+  return true;
 }
 
-// 从文件系统和内存缓存中删除分享信息
+// 从所有存储中删除分享信息
 function removeShareInfo(shareId: string) {
+  console.log(`删除分享: ${shareId}`);
+  
+  // 从内存缓存删除
+  sharesCache.delete(shareId);
+  
+  // 从服务器变量删除
+  delete serverShares[shareId];
+  
+  // 从文件系统删除
   try {
     const sharePath = path.join(SHARES_DIR, `${shareId}.json`);
     if (fs.existsSync(sharePath)) {
       fs.unlinkSync(sharePath);
+      console.log(`分享文件已从文件系统删除: ${sharePath}`);
     }
-    sharesCache.delete(shareId);
-    console.log(`分享链接已过期并移除: ${shareId}`);
   } catch (error) {
-    console.error(`Error removing share info for ${shareId}:`, error);
+    console.warn(`从文件系统删除分享失败 (非致命错误): ${shareId}`, error);
   }
 }
 
