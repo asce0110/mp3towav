@@ -56,6 +56,11 @@ const nextConfig = {
   serverExternalPackages: ['ffmpeg-static'],
 }
 
+// 显式配置API上传大小限制
+if (!process.env.NEXT_PUBLIC_API_BODYPARSER_SIZE_LIMIT) {
+  process.env.NEXT_PUBLIC_API_BODYPARSER_SIZE_LIMIT = '100mb';
+}
+
 mergeConfig(nextConfig, userConfig)
 
 function mergeConfig(nextConfig, userConfig) {
