@@ -7,16 +7,24 @@ node_modules
 .vscode
 tmp/
 
-# Webpack cache exclusions
-.next/cache/
-.next/cache/webpack/
+# 忽略所有webpack缓存文件
+.next/cache/**/*
+.next/cache/webpack/**/*
 **/*.pack
 **/*.map
 **/*.pack.old
 **/cache/
 **/cache/webpack/
 
-# Development files
+# 特别指定要忽略的打包文件
+**/*.hot-update.*
+**/.webpack
+**/.cache
+**/*.js.map
+**/*.css.map
+**/*.LICENSE.txt
+
+# 忽略大型测试和开发文件
 **/.DS_Store
 **/.env.development
 **/.env.local
@@ -27,8 +35,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
-# Large test files
 test/
 tests/
-__tests__/ 
+__tests__/
+__mocks__/
+coverage/
+docker/
+docs/
+.storybook/ 

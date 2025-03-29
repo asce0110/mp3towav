@@ -46,17 +46,6 @@ const nextConfig = {
       },
     ];
   },
-  // 不再需要重写sitemap.xml，因为我们有了直接的路由
-  /* 注释掉旧的重写规则
-  async rewrites() {
-    return [
-      {
-        source: '/sitemap.xml',
-        destination: '/api/sitemap',
-      },
-    ];
-  },
-  */
   serverRuntimeConfig: {
     maxBodySize: '500mb', // 设置最大上传大小为 500MB
   },
@@ -72,13 +61,16 @@ const nextConfig = {
     if (!dev) {
       config.optimization.minimize = true;
       
+      // 启用源码裁剪(Tree Shaking)
+      config.optimization.usedExports = true;
+      
       // 减小chunk大小，避免超过Cloudflare 25MB限制
       config.optimization.splitChunks = {
         chunks: 'all',
         maxInitialRequests: 30,
         maxAsyncRequests: 30,
         minSize: 20000,
-        maxSize: 10 * 1024 * 1024, // 减小到10MB
+        maxSize: 3 * 1024 * 1024, // 减小到3MB
         cacheGroups: {
           framework: {
             name: 'framework',
@@ -100,32 +92,47 @@ const nextConfig = {
             priority: 20,
           },
           shared: {
-            name: (module, chunks) => {
-              return 'shared-' + 
-                chunks.map(c => c.name).join('-');
-            },
+            name: 'shared',
             priority: 10,
             minChunks: 2,
             reuseExistingChunk: true,
+            enforce: true
           }
         }
       };
       
       // 优化CSS
-      if (config.optimization.minimizer) {
-        config.optimization.minimizer.push(
-          new (require('css-minimizer-webpack-plugin'))({})
-        );
+      if (!isServer) {
+        const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
+        if (!config.optimization.minimizer) {
+          config.optimization.minimizer = [];
+        }
+        config.optimization.minimizer.push(new CssMinimizerPlugin());
       }
-    }
-    
-    // 避免生成source maps减小文件大小
-    if (!dev && !isServer) {
-      config.devtool = false;
+      
+      // 禁止生成source maps减小文件大小
+      if (!isServer) {
+        config.devtool = false;
+      }
+      
+      // 添加自定义插件以去除开发特性
+      config.plugins = config.plugins || [];
+      config.plugins.push(
+        new config.webpack.DefinePlugin({
+          'process.env.NODE_ENV': JSON.stringify('production')
+        })
+      );
     }
     
     return config;
   },
+  
+  // 配置额外忽略的文件和目录
+  distDir: '.next',
+  generateBuildId: async () => {
+    return `build-${new Date().getTime()}`;
+  },
+  poweredByHeader: false
 }
 
 // 显式配置API上传大小限制
