@@ -600,15 +600,17 @@ export function MP3toWAVConverter() {
     setIsConverting(true);
     setProgress(0);
     
+    console.log('[转换] 开始处理文件:', file.name, '大小:', file.size);
+    
     // First try client-side conversion
     try {
       await handleClientSideConversion();
     } catch (error) {
-      console.error('Client-side conversion failed, falling back to server conversion:', error);
+      console.error('[转换] 客户端转换失败，回退到服务器转换:', error);
       try {
         await handleServerConversion();
       } catch (serverError) {
-        console.error('Server conversion also failed:', serverError);
+        console.error('[转换] 服务器转换也失败:', serverError);
         toast({
           title: "Conversion Failed",
           description: "Could not complete conversion. Please try another file.",

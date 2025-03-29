@@ -6,6 +6,24 @@ import {
   ListObjectsV2Command
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import path from 'path';
+import fs from 'fs';
+
+// 动态加载dotenv配置文件
+try {
+  // 优先尝试加载.env.local
+  const envLocalPath = path.join(process.cwd(), '.env.local');
+  if (fs.existsSync(envLocalPath)) {
+    require('dotenv').config({ path: envLocalPath });
+    console.log('已从.env.local加载R2环境变量');
+  } else {
+    // 回退到.env
+    require('dotenv').config();
+    console.log('已从.env加载R2环境变量');
+  }
+} catch (error) {
+  console.warn('加载环境变量文件失败，将使用当前环境中的变量:', error);
+}
 
 // 获取环境变量
 const r2AccountId = process.env.R2_ACCOUNT_ID || '';

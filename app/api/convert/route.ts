@@ -439,21 +439,22 @@ const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, origina
   // 确保临时目录存在
   if (!fs.existsSync(TMP_DIR)) {
     fs.mkdirSync(TMP_DIR, { recursive: true });
+    console.log(`[API:convert] 创建临时目录: ${TMP_DIR}`);
   }
   
   // 保存到本地文件系统
   const outputPath = path.join(TMP_DIR, `${fileId}.wav`);
   fs.writeFileSync(outputPath, outputBuffer);
-  console.log(`已保存WAV文件到本地: ${outputPath}, 大小: ${outputBuffer.length} 字节`);
+  console.log(`[API:convert] 已保存WAV文件到本地: ${outputPath}, 大小: ${outputBuffer.length} 字节`);
   
   // 上传到R2存储（如果已配置）
   let r2Success = false;
   if (isR2Configured) {
     try {
-      console.log(`开始上传WAV文件到R2: fileId=${fileId}, 大小=${outputBuffer.length} 字节`);
+      const r2Key = `wav/${fileId}.wav`;
+      console.log(`[API:convert] 开始上传WAV文件到R2: fileId=${fileId}, 文件路径=${r2Key}, 大小=${outputBuffer.length} 字节`);
       
       // 上传到wav/目录
-      const r2Key = `wav/${fileId}.wav`;
       r2Success = await uploadToR2(
         r2Key,
         outputBuffer,
@@ -467,16 +468,16 @@ const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, origina
       );
       
       if (r2Success) {
-        console.log(`文件成功上传到R2: ${r2Key}`);
+        console.log(`[API:convert] 文件成功上传到R2: ${r2Key}`);
       } else {
-        console.error(`文件上传到R2失败: ${r2Key}`);
+        console.error(`[API:convert] 文件上传到R2失败: ${r2Key}`);
       }
     } catch (r2Error) {
-      console.error('R2上传错误:', r2Error);
+      console.error('[API:convert] R2上传错误:', r2Error);
       r2Success = false;
     }
   } else {
-    console.log('R2未配置，跳过上传');
+    console.log('[API:convert] R2未配置，跳过上传');
   }
   
   // 返回响应
