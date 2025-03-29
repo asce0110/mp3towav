@@ -1,0 +1,19 @@
+[build]
+command = "pnpm build"
+output_directory = ".next"
+compatibility_date = "2023-06-28"
+node_compat = true
+compatibility_flags = ["nodejs_compat"]
+
+[build.environment]
+NODE_VERSION = "20"
+
+[functions]
+// 避免文件上传大小限制
+max_upload_size = "100M"
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/api/:splat"
+status = 200
+force = true 

@@ -1,0 +1,8 @@
+# 忽略部署到Cloudflare的文件
+node_modules
+.git
+.github
+.env
+.env.local
+.vscode
+tmp/ 
