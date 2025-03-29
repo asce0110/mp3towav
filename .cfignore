@@ -5,4 +5,8 @@ node_modules
 .env
 .env.local
 .vscode
-tmp/ 
+tmp/
+.next/cache/
+.next/webpack/
+**/*.pack
+**/*.map 

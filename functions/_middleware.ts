@@ -1,4 +1,7 @@
-import { Context } from "@cloudflare/workers-types";
+export interface Context {
+  next: () => Promise<Response>;
+  env: Record<string, any>;
+}
 
 export const onRequest = async (context: Context) => {
   // 增加头部，允许更大的请求体
