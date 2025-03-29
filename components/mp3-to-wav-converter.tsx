@@ -17,7 +17,7 @@ import { ToastAction } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 
 // Mock function to simulate conversion process
-const convertFile = async (file: File, settings: ConversionSettings, onProgress: (progressUpdater: (prev: number) => number) => void): Promise<{ fileId: string, shareId: string, originalName: string, ffmpegAvailable: boolean, url?: string }> => {
+const convertFile = async (file: File, settings: ConversionSettings, onProgress: (progressUpdater: (prev: number) => number) => void): Promise<{ fileId: string, shareId: string, originalName: string, ffmpegAvailable: boolean, url?: string, r2Success?: boolean, storedInR2?: boolean }> => {
   try {
     console.log('Preparing to send conversion request, file size:', file.size, 'file type:', file.type);
     
@@ -846,6 +846,28 @@ export function MP3toWAVConverter() {
         setOriginalName(file.name);
         setDownloadUrl(data.url || `/api/convert?fileId=${data.fileId}`);
         setFfmpegAvailable(data.ffmpegAvailable);
+        
+        // 检查是否成功上传到R2
+        if (data.r2Success) {
+          console.log('文件已成功上传到R2存储');
+          toast({
+            title: "转换完成",
+            description: "MP3已成功转换为WAV，并已存储在云端，可以安全分享。",
+          });
+        } else if (data.storedInR2) {
+          console.log('文件已存储在R2中');
+          toast({
+            title: "转换完成",
+            description: "MP3已成功转换为WAV，并已存储在云端，可以安全分享。",
+          });
+        } else {
+          console.log('文件未上传到R2，仅保存在本地');
+          toast({
+            title: "转换完成",
+            description: "MP3已成功转换为WAV。注意：文件仅存储在本地，分享链接可能在24小时后失效。",
+          });
+        }
+        
         setProgress(100);
       }
     } catch (error) {

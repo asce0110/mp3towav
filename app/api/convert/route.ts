@@ -365,228 +365,183 @@ const simpleConvert = async (inputPath: string, outputPath: string, channels: nu
   }
 };
 
-export async function POST(request: NextRequest) {
+// 转换并上传函数 - 使用FFmpeg转换文件，并上传到R2
+const convertWithFFmpeg = async (fileBuffer: Buffer, sampleRate: number, channels: number): Promise<Buffer> => {
+  console.log(`开始使用FFmpeg转换，采样率=${sampleRate}, 声道=${channels}`);
+  
+  // 生成临时文件名
+  const tempInputName = `input-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.mp3`;
+  const tempOutputName = `output-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.wav`;
+  
+  const tempInputPath = path.join(TMP_DIR, tempInputName);
+  const tempOutputPath = path.join(TMP_DIR, tempOutputName);
+  
+  // 写入临时输入文件
+  fs.writeFileSync(tempInputPath, fileBuffer);
+  console.log(`临时MP3文件保存到: ${tempInputPath}`);
+  
   try {
-    console.log('开始处理音频转换请求');
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const sampleRate = parseInt(formData.get('sampleRate') as string) || 44100;
-    const bitDepth = parseInt(formData.get('bitDepth') as string) || 16;
-    const channels = parseInt(formData.get('channels') as string) || 2;
-    const normalize = formData.get('normalize') === 'true';
-    const useSimpleConversion = formData.get('useSimpleConversion') === 'true' || !ffmpegAvailable;
+    // 使用ffmpeg转换
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(tempInputPath)
+        .audioFrequency(sampleRate)
+        .audioChannels(channels)
+        .format('wav')
+        .on('error', (err) => {
+          console.error('FFmpeg处理错误:', err);
+          reject(err);
+        })
+        .on('end', () => {
+          console.log('FFmpeg处理完成');
+          resolve();
+        })
+        .save(tempOutputPath);
+    });
+    
+    // 读取输出文件
+    const outputBuffer = fs.readFileSync(tempOutputPath);
+    console.log(`WAV文件生成成功，大小: ${outputBuffer.length} 字节`);
+    
+    // 清理临时文件
+    try {
+      fs.unlinkSync(tempInputPath);
+      fs.unlinkSync(tempOutputPath);
+      console.log('临时文件已清理');
+    } catch (cleanupError) {
+      console.warn('清理临时文件失败:', cleanupError);
+    }
+    
+    return outputBuffer;
+  } catch (error) {
+    console.error('FFmpeg处理失败:', error);
+    throw error;
+  }
+};
 
-    console.log('接收到转换请求:', { 
-      fileName: file.name,
-      sampleRate,
-      bitDepth,
-      channels,
-      normalize,
-      useSimpleConversion
-    });
-    
-    if (!file) {
-      console.log('未提供文件');
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-    
-    console.log(`接收到文件: ${file.name}, 大小: ${file.size} bytes, 类型: ${file.type}`);
-    
-    // 检查文件类型
-    if (!file.type.includes('audio/mpeg')) {
-      console.log(`文件类型不符: ${file.type}`);
-      return NextResponse.json({ error: 'File must be MP3 format' }, { status: 400 });
-    }
-    
-    // 检查文件大小
-    if (file.size > 500 * 1024 * 1024) { // 500MB
-      console.log(`文件太大: ${file.size} bytes`);
-      return NextResponse.json({ error: 'File size exceeds 500MB limit' }, { status: 400 });
-    }
-    
-    // 获取转换参数
-    const volume = parseFloat(formData.get('volume') as string) || 1.0;
-    const trimStart = parseFloat(formData.get('trimStart') as string) || 0;
-    const trimEnd = parseFloat(formData.get('trimEnd') as string) || 0;
-    
-    console.log('转换参数:', {
-      volume, sampleRate, channels, bitDepth, trimStart, trimEnd
-    });
-    
-    // 生成唯一文件ID
-    const fileId = uuidv4();
-    const inputPath = path.join(TMP_DIR, `${fileId}.mp3`);
-    const outputPath = path.join(TMP_DIR, `${fileId}.wav`);
-    
-    console.log(`临时文件路径: 输入=${inputPath}, 输出=${outputPath}`);
-    
-    // 保存上传的文件
-    console.log('正在保存上传的文件...');
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    
-    // 如果R2配置可用，则上传到R2
-    let uploadedToR2 = false;
-    if (isR2Configured) {
-      console.log('尝试上传MP3到R2...');
-      uploadedToR2 = await uploadToR2(
-        `mp3/${fileId}.mp3`, 
-        fileBuffer, 
-        { originalName: file.name },
-        'audio/mpeg'
-      );
-    }
-    
-    // 始终保存到本地用于转换
-    fs.writeFileSync(inputPath, fileBuffer);
-    console.log(`文件已保存到: ${inputPath}`);
-    
-    let conversionSuccess = false;
-    
-    // 如果用户请求简单转换，或 FFmpeg 不可用
-    if (useSimpleConversion) {
-      console.log('使用简单转换模式，跳过 FFmpeg 处理');
-      conversionSuccess = await simpleConvert(inputPath, outputPath, channels, sampleRate, bitDepth, volume, trimStart, trimEnd);
-    } else {
-      // 尝试用 fluent-ffmpeg 转换
-      try {
-        console.log('尝试使用 fluent-ffmpeg 转换...');
-        // 构建FFmpeg命令
-        console.log('构建FFmpeg命令...');
-        let command = ffmpeg(inputPath);
-        
-        try {
-          // 应用音量
-          if (volume !== 1.0) {
-            console.log(`应用音量: ${volume/100}`);
-            command = command.audioFilters(`volume=${volume/100}`);
-          }
-          
-          // 应用裁剪
-          if (trimStart > 0 || trimEnd > 0) {
-            console.log(`应用裁剪: 开始=${trimStart}s, 结束=${trimEnd}s`);
-            command = command.setStartTime(trimStart);
-            
-            if (trimEnd > trimStart) {
-              command = command.setDuration(trimEnd - trimStart);
-            }
-          }
-          
-          // 设置输出参数
-          console.log(`设置输出参数: 采样率=${sampleRate}, 声道=${channels}, 位深=${bitDepth}`);
-          command = command
-            .audioFrequency(sampleRate)
-            .audioChannels(channels)
-            .audioBitrate(bitDepth === 32 ? '1536k' : bitDepth === 24 ? '1152k' : '768k')
-            .format('wav');
-          
-          // 添加错误处理
-          command.on('error', (err) => {
-            console.error('FFmpeg错误:', err);
-            // 删除临时文件
-            if (fs.existsSync(inputPath)) {
-              try {
-                fs.unlinkSync(inputPath);
-              } catch (e) {
-                console.error('删除输入文件失败:', e);
-              }
-            }
-          });
-          
-          // 添加进度回调
-          command.on('progress', (progress) => {
-            console.log(`转换进度: ${progress.percent ? progress.percent.toFixed(1) : 0}%`);
-          });
-          
-          // 执行转换
-          console.log('开始执行转换...');
-          try {
-            await new Promise<void>((resolve, reject) => {
-              command.save(outputPath)
-                .on('end', () => {
-                  console.log('转换完成!');
-                  conversionSuccess = true;
-                  resolve();
-                })
-                .on('error', (err) => {
-                  console.error('转换过程出错:', err);
-                  reject(err);
-                });
-            });
-          } catch (promiseError) {
-            console.error('转换Promise错误:', promiseError);
-            throw promiseError;
-          }
-        } catch (ffmpegError) {
-          console.error('FFmpeg命令配置错误:', ffmpegError);
-          throw ffmpegError;
-        }
-      } catch (fluentError) {
-        console.error('fluent-ffmpeg转换失败，尝试简单转换方法...', fluentError);
-        // FFmpeg失败时使用简单转换
-        conversionSuccess = await simpleConvert(inputPath, outputPath, channels, sampleRate, bitDepth, volume, trimStart, trimEnd);
-      }
-    }
-    
-    // 检查转换是否成功
-    if (!conversionSuccess && !fs.existsSync(outputPath)) {
-      console.error('转换失败，且输出文件不存在');
-      return NextResponse.json({ 
-        error: 'Conversion failed, output file was not created' 
-      }, { status: 500 });
-    }
-    
-    // 读取转换后的WAV文件并上传到R2
-    let wavUrl = `/api/convert?fileId=${fileId}`;
-    let r2WavKey = `wav/${fileId}.wav`;
-    
-    if (isR2Configured) {
-      console.log('尝试上传WAV到R2...');
-      const wavBuffer = fs.readFileSync(outputPath);
-      const uploadSuccess = await uploadToR2(
-        r2WavKey,
-        wavBuffer,
+// 检查文件是否是有效的MP3
+const isValidMP3 = (buffer: Buffer): boolean => {
+  // MP3文件通常以ID3标签或MPEG帧头开始
+  // 检查ID3v2标签 (以'ID3'开始)
+  if (buffer.length > 3 && buffer.toString('ascii', 0, 3) === 'ID3') {
+    return true;
+  }
+  
+  // 检查MPEG帧同步标记 (0xFF开始)
+  if (buffer.length > 2 && buffer[0] === 0xFF && (buffer[1] & 0xE0) === 0xE0) {
+    return true;
+  }
+  
+  return false;
+};
+
+// 转换完成后，保存WAV文件并返回结果
+const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, originalName: string): Promise<Response> => {
+  // 确保临时目录存在
+  if (!fs.existsSync(TMP_DIR)) {
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+  }
+  
+  // 保存到本地文件系统
+  const outputPath = path.join(TMP_DIR, `${fileId}.wav`);
+  fs.writeFileSync(outputPath, outputBuffer);
+  console.log(`已保存WAV文件到本地: ${outputPath}, 大小: ${outputBuffer.length} 字节`);
+  
+  // 上传到R2存储（如果已配置）
+  let r2Success = false;
+  if (isR2Configured) {
+    try {
+      console.log(`开始上传WAV文件到R2: fileId=${fileId}, 大小=${outputBuffer.length} 字节`);
+      
+      // 上传到wav/目录
+      const r2Key = `wav/${fileId}.wav`;
+      r2Success = await uploadToR2(
+        r2Key,
+        outputBuffer,
         {
-          originalName: file.name.replace(/\.mp3$/i, '.wav'),
-          fileId: fileId
+          'original-name': originalName,
+          'file-id': fileId,
+          'created-at': new Date().toISOString(),
+          'source': 'api-conversion'
         },
         'audio/wav'
       );
       
-      if (uploadSuccess) {
-        console.log('WAV文件成功上传到R2');
-        // 生成预签名URL (24小时有效)
-        const presignedUrl = await generatePresignedUrl(r2WavKey);
-        if (presignedUrl) {
-          wavUrl = presignedUrl;
-          console.log('已生成预签名URL');
-        }
+      if (r2Success) {
+        console.log(`文件成功上传到R2: ${r2Key}`);
+      } else {
+        console.error(`文件上传到R2失败: ${r2Key}`);
       }
+    } catch (r2Error) {
+      console.error('R2上传错误:', r2Error);
+      r2Success = false;
+    }
+  } else {
+    console.log('R2未配置，跳过上传');
+  }
+  
+  // 返回响应
+  return NextResponse.json({
+    success: true,
+    fileId,
+    originalName,
+    ffmpegAvailable: true,
+    r2Success,
+    size: outputBuffer.length
+  });
+};
+
+// 处理POST请求 - 执行文件转换
+export async function POST(request: NextRequest) {
+  console.log('接收到转换请求');
+  
+  // 生成唯一ID
+  const fileId = uuidv4();
+  let originalName = '';
+  
+  try {
+    // 读取请求数据
+    const formData = await request.formData();
+    console.log('已解析FormData');
+    
+    // 获取MP3文件
+    const mp3File = formData.get('file');
+    
+    if (!mp3File || !(mp3File instanceof File)) {
+      console.error('缺少MP3文件或文件格式不正确');
+      return NextResponse.json({ error: 'Missing or invalid MP3 file' }, { status: 400 });
     }
     
-    // 生成共享ID
-    const shareId = uuidv4().slice(0, 8);
+    // 获取文件信息
+    originalName = mp3File.name;
+    const fileSize = mp3File.size;
+    console.log(`处理文件: ${originalName}, 大小: ${fileSize} 字节`);
     
-    // 如果使用本地存储，设置文件清理
-    if (!isR2Configured) {
-      cleanupFiles([fileId]);
+    // 读取文件内容
+    const fileBuffer = Buffer.from(await mp3File.arrayBuffer());
+    
+    // 检查是否为有效的MP3文件
+    if (!isValidMP3(fileBuffer)) {
+      console.error('无效的MP3文件');
+      return NextResponse.json({ error: 'Invalid MP3 file' }, { status: 400 });
     }
     
-    console.log(`转换成功, fileId=${fileId}, shareId=${shareId}`);
-    return NextResponse.json({
-      success: true,
-      fileId,
-      shareId,
-      originalName: file.name.replace(/\.[^/.]+$/, '.wav'),
-      url: wavUrl,
-      ffmpegAvailable: ffmpegAvailable,
-      isSampleAudio: !ffmpegAvailable || useSimpleConversion,
-      storedInR2: isR2Configured
-    });
+    // 获取转换选项
+    const sampleRate = formData.get('sampleRate')?.toString() || '44100';
+    const channels = formData.get('channels')?.toString() || '2';
+    console.log(`转换选项: 采样率=${sampleRate}, 声道=${channels}`);
+    
+    // 本地处理模式 - 使用ffmpeg
+    const outputBuffer = await convertWithFFmpeg(fileBuffer, parseInt(sampleRate), parseInt(channels));
+    
+    // 保存WAV文件并返回结果
+    return await saveAndReturnResult(outputBuffer, fileId, originalName);
   } catch (error) {
-    console.error('转换过程发生错误:', error);
+    console.error('转换过程中出错:', error);
     return NextResponse.json({ 
-      error: 'File conversion failed', 
-      details: String(error) 
+      error: 'Conversion failed', 
+      detail: error instanceof Error ? error.message : 'Unknown error',
+      fileId,
+      originalName 
     }, { status: 500 });
   }
 }

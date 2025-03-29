@@ -16,6 +16,8 @@ interface ShareInfo {
   originalName: string;
   createdAt: number;
   expiresAt: number;
+  storageType: string;
+  shareId?: string; // 添加可选的shareId字段
 }
 
 // 模拟数据库存储，使用内存缓存
@@ -23,13 +25,20 @@ const sharesCache = new Map<string, ShareInfo>();
 
 // 临时文件目录
 const TMP_DIR = path.join(process.cwd(), 'tmp');
+const SHARES_DIR = path.join(TMP_DIR, 'shares'); // 定义分享目录常量
 
 // 检查环境
 const isVercelEnv = process.env.VERCEL === '1';
 console.log(`[API:share] 当前环境: ${isVercelEnv ? 'Vercel' : '本地开发'}`);
 console.log(`[API:share] 当前工作目录: ${process.cwd()}`);
 console.log(`[API:share] TMP_DIR 路径: ${TMP_DIR}`);
+console.log(`[API:share] SHARES_DIR 路径: ${SHARES_DIR}`);
 console.log(`[API:share] R2配置状态: isR2Configured=${isR2Configured}`);
+
+// 生成短ID
+function generateShortId(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
 
 // 确保临时目录存在
 function ensureTmpDir() {
@@ -156,155 +165,215 @@ async function removeShareInfo(shareId: string): Promise<void> {
 
 // 创建分享链接
 export async function POST(request: NextRequest) {
+  // 生成唯一请求ID用于跟踪
+  const requestId = request.headers.get('x-request-id') || `share-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
   try {
-    const requestId = request.headers.get('x-request-id') || `share-${Date.now()}`;
-    console.log(`[API:share:${requestId}] 接收到创建分享请求`);
-    
-    const bodyText = await request.text();
-    console.log(`[API:share:${requestId}] 请求体: ${bodyText}`);
-    
-    const { fileId, originalName, shareId } = JSON.parse(bodyText);
+    console.log(`[API:share:${requestId}] 开始处理创建分享请求`);
+    const data = await request.json();
+    const { fileId, originalName } = data;
     
     if (!fileId) {
-      console.error(`[API:share:${requestId}] 创建分享失败：缺少fileId参数`);
-      return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+      console.log(`[API:share:${requestId}] 缺少fileId参数`);
+      return NextResponse.json({ error: 'Missing fileId parameter' }, { status: 400 });
     }
     
-    console.log(`[API:share:${requestId}] 创建分享: fileId=${fileId}, originalName=${originalName || '未指定'}`);
+    console.log(`[API:share:${requestId}] 处理分享请求: fileId=${fileId}, originalName=${originalName || 'unknown'}`);
     
-    // 检查R2是否已配置
-    if (!isR2Configured) {
-      console.error(`[API:share:${requestId}] R2未配置，无法创建分享`);
-      return NextResponse.json({ 
-        error: 'R2 storage not configured', 
-        detail: 'Cloud storage is required for file sharing feature'
-      }, { status: 500 });
+    // 检查文件是否存在于R2或本地文件系统
+    let fileSource = 'unknown';
+    let hasLocalFile = false;
+    let hasR2File = false;
+    
+    // 本地文件路径
+    const localFilePath = path.join(TMP_DIR, `${fileId}.wav`);
+    
+    // 检查本地文件系统
+    if (fs.existsSync(localFilePath)) {
+      console.log(`[API:share:${requestId}] 本地文件存在: ${localFilePath}`);
+      hasLocalFile = true;
+      fileSource = 'local';
+    } else {
+      console.log(`[API:share:${requestId}] 本地文件不存在: ${localFilePath}`);
     }
     
-    // 检查R2连接
-    try {
-      console.log(`[API:share:${requestId}] 检查R2连接状态...`);
-      const isConnected = await validateR2Connection();
-      if (!isConnected) {
-        console.error(`[API:share:${requestId}] R2连接失败，无法创建分享`);
-        return NextResponse.json({ 
-          error: 'R2 connection failed', 
-          detail: 'Could not connect to cloud storage'
-        }, { status: 500 });
-      }
-      console.log(`[API:share:${requestId}] R2连接测试成功`);
-    } catch (r2Error) {
-      console.error(`[API:share:${requestId}] R2连接测试异常:`, r2Error);
-      return NextResponse.json({ 
-        error: 'R2 connection test failed', 
-        detail: 'Error testing connection to cloud storage',
-        message: r2Error instanceof Error ? r2Error.message : String(r2Error)
-      }, { status: 500 });
-    }
-    
-    // 检查文件是否存在于R2
-    console.log(`[API:share:${requestId}] 检查文件是否存在于R2: wav/${fileId}.wav`);
-    let fileExists = false;
-    
-    try {
-      fileExists = await fileExistsInR2(`wav/${fileId}.wav`);
-      if (!fileExists) {
-        console.log(`[API:share:${requestId}] 文件不存在于R2: wav/${fileId}.wav, 尝试检查本地文件...`);
-        
-        // 检查本地文件并上传到R2
-        const localFilePath = path.join(TMP_DIR, `${fileId}.wav`);
-        if (fs.existsSync(localFilePath)) {
-          console.log(`[API:share:${requestId}] 找到本地文件: ${localFilePath}, 尝试上传到R2...`);
-          
-          // 读取文件并上传到R2
-          const fileBuffer = fs.readFileSync(localFilePath);
-          console.log(`[API:share:${requestId}] 读取本地文件成功，大小: ${fileBuffer.length} 字节`);
-          
-          const uploadSuccess = await uploadToR2(
-            `wav/${fileId}.wav`,
-            fileBuffer,
-            {
-              'source': 'local-file',
-              'original-name': originalName || `${fileId}.wav`,
-              'request-id': requestId
-            },
-            'audio/wav'
-          );
-          
-          if (uploadSuccess) {
-            console.log(`[API:share:${requestId}] 文件成功上传到R2: wav/${fileId}.wav`);
-            fileExists = true;
-          } else {
-            console.error(`[API:share:${requestId}] 上传文件到R2失败: wav/${fileId}.wav`);
-          }
-        } else {
-          console.error(`[API:share:${requestId}] 本地文件也不存在: ${localFilePath}`);
-          
-          // 检查TMP目录下的文件
-          try {
-            const tmpFiles = fs.readdirSync(TMP_DIR);
-            console.log(`[API:share:${requestId}] TMP目录内容: ${tmpFiles.length > 0 ? tmpFiles.join(', ') : '空目录'}`);
-          } catch (e) {
-            console.error(`[API:share:${requestId}] 无法读取TMP目录内容:`, e);
-          }
+    // 检查R2（如果配置了R2）
+    const r2Key = `wav/${fileId}.wav`;
+    if (isR2Configured) {
+      try {
+        hasR2File = await fileExistsInR2(r2Key);
+        console.log(`[API:share:${requestId}] R2文件检查结果: ${r2Key} 存在=${hasR2File}`);
+        if (hasR2File) {
+          fileSource = 'r2';
         }
-      } else {
-        console.log(`[API:share:${requestId}] 文件存在于R2: wav/${fileId}.wav`);
+      } catch (r2Error) {
+        console.error(`[API:share:${requestId}] 检查R2文件出错:`, r2Error);
       }
-    } catch (error) {
-      console.error(`[API:share:${requestId}] 检查文件时出错:`, error);
     }
     
-    if (!fileExists) {
-      console.error(`[API:share:${requestId}] 创建分享失败: 文件不存在 fileId=${fileId}`);
+    // 如果文件既不在本地也不在R2中，返回错误
+    if (!hasLocalFile && !hasR2File) {
+      console.error(`[API:share:${requestId}] 文件不存在: fileId=${fileId}`);
       return NextResponse.json({ 
-        error: 'File not found',
-        detail: 'The file you are trying to share could not be found in storage'
+        error: 'File not found', 
+        detail: 'The file you are trying to share could not be found in storage',
+        requestId,
+        timestamp: Date.now()
       }, { status: 404 });
     }
     
-    // 使用提供的shareId或生成一个新的
-    const finalShareId = shareId || Math.random().toString(36).substring(2, 10);
+    // 如果文件在本地但不在R2，并且R2已配置，上传到R2
+    if (hasLocalFile && !hasR2File && isR2Configured) {
+      try {
+        console.log(`[API:share:${requestId}] 尝试将本地文件上传到R2: ${r2Key}`);
+        const fileBuffer = fs.readFileSync(localFilePath);
+        const uploadSuccess = await uploadToR2(
+          r2Key,
+          fileBuffer,
+          {
+            'source': 'share-api',
+            'request-id': requestId,
+            'original-name': originalName || `${fileId}.wav`
+          },
+          'audio/wav'
+        );
+        
+        if (uploadSuccess) {
+          console.log(`[API:share:${requestId}] 文件成功上传到R2: ${r2Key}`);
+          fileSource = 'both';
+          hasR2File = true;
+        } else {
+          console.warn(`[API:share:${requestId}] 文件上传到R2失败: ${r2Key}`);
+        }
+      } catch (uploadError) {
+        console.error(`[API:share:${requestId}] 上传到R2时出错:`, uploadError);
+      }
+    }
     
-    // 计算过期时间（24小时后）
+    // 如果文件在R2但不在本地，下载到本地
+    if (!hasLocalFile && hasR2File && isR2Configured) {
+      try {
+        console.log(`[API:share:${requestId}] 尝试从R2下载文件到本地: ${r2Key}`);
+        
+        // 确保目录存在
+        if (!fs.existsSync(TMP_DIR)) {
+          fs.mkdirSync(TMP_DIR, { recursive: true });
+        }
+        
+        const fileBuffer = await downloadFromR2(r2Key);
+        if (fileBuffer) {
+          fs.writeFileSync(localFilePath, fileBuffer);
+          console.log(`[API:share:${requestId}] 文件已从R2下载到本地: ${localFilePath}`);
+          hasLocalFile = true;
+          fileSource = 'both';
+        } else {
+          console.warn(`[API:share:${requestId}] 从R2下载文件失败: ${r2Key}`);
+        }
+      } catch (downloadError) {
+        console.error(`[API:share:${requestId}] 从R2下载文件时出错:`, downloadError);
+      }
+    }
+    
+    // 生成唯一分享ID
+    const shareId = generateShortId();
+    console.log(`[API:share:${requestId}] 生成分享ID: ${shareId}`);
+    
+    // 创建分享信息对象
     const now = Date.now();
-    const expiresAt = now + (1000 * 60 * 60 * 24);
+    const expiresAt = now + 24 * 60 * 60 * 1000; // 24小时后过期
     
-    // 创建分享信息
     const shareInfo: ShareInfo = {
+      shareId,
       fileId,
       originalName: originalName || `${fileId}.wav`,
       createdAt: now,
-      expiresAt: expiresAt
+      expiresAt,
+      storageType: fileSource,
     };
     
-    console.log(`[API:share:${requestId}] 准备保存分享信息到R2: shareId=${finalShareId}`);
+    console.log(`[API:share:${requestId}] 创建分享信息: ${JSON.stringify(shareInfo)}`);
     
     // 保存分享信息到R2
-    const saveSuccess = await saveShareInfoToR2(finalShareId, shareInfo);
-    if (!saveSuccess) {
-      console.error(`[API:share:${requestId}] 保存分享信息到R2失败: shareId=${finalShareId}`);
-      return NextResponse.json({ 
-        error: 'Failed to save share information',
-        detail: 'Could not save share metadata to storage'
-      }, { status: 500 });
+    let savedToR2 = false;
+    if (isR2Configured) {
+      try {
+        console.log(`[API:share:${requestId}] 尝试保存分享信息到R2: shares/${shareId}.json`);
+        const shareInfoJson = JSON.stringify(shareInfo);
+        const uploadSuccess = await uploadToR2(
+          `shares/${shareId}.json`, 
+          Buffer.from(shareInfoJson), 
+          {
+            'request-id': requestId,
+            'expires-at': expiresAt.toString(),
+            'file-id': fileId
+          }, 
+          'application/json'
+        );
+        
+        if (uploadSuccess) {
+          console.log(`[API:share:${requestId}] 分享信息成功保存到R2`);
+          savedToR2 = true;
+        } else {
+          console.warn(`[API:share:${requestId}] 分享信息保存到R2失败`);
+        }
+      } catch (r2SaveError) {
+        console.error(`[API:share:${requestId}] 保存分享信息到R2时出错:`, r2SaveError);
+      }
     }
     
-    const shareUrl = `${request.nextUrl.origin}/share/${finalShareId}`;
-    console.log(`[API:share:${requestId}] 分享创建成功: shareId=${finalShareId}, url=${shareUrl}`);
+    // 同时保存到本地缓存
+    sharesCache.set(shareId, shareInfo);
+    console.log(`[API:share:${requestId}] 分享信息保存到内存缓存`);
     
+    // 保存到本地文件系统
+    try {
+      if (!fs.existsSync(SHARES_DIR)) {
+        fs.mkdirSync(SHARES_DIR, { recursive: true });
+        console.log(`[API:share:${requestId}] 创建分享目录: ${SHARES_DIR}`);
+      }
+      
+      const shareFilePath = path.join(SHARES_DIR, `${shareId}.json`);
+      fs.writeFileSync(shareFilePath, JSON.stringify(shareInfo));
+      console.log(`[API:share:${requestId}] 分享信息保存到本地文件: ${shareFilePath}`);
+      
+      // 设置定时删除本地文件的任务（24小时后）
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(shareFilePath)) {
+            fs.unlinkSync(shareFilePath);
+            console.log(`[清理] 删除过期的分享信息文件: ${shareFilePath}`);
+          }
+          
+          // 从缓存中移除
+          sharesCache.delete(shareId);
+        } catch (cleanupError) {
+          console.error(`[清理] 删除过期分享文件出错:`, cleanupError);
+        }
+      }, 24 * 60 * 60 * 1000);
+    } catch (fsError) {
+      console.error(`[API:share:${requestId}] 保存分享信息到本地文件时出错:`, fsError);
+    }
+    
+    console.log(`[API:share:${requestId}] 分享创建成功: id=${shareId}, fileId=${fileId}, 存储=${fileSource}`);
+    
+    // 返回成功响应
     return NextResponse.json({
       success: true,
-      shareId: finalShareId,
-      shareUrl: shareUrl,
+      shareId,
+      fileId,
       expiresAt: new Date(expiresAt).toISOString(),
-      storageType: 'R2'
+      storageType: fileSource,
+      savedToR2,
+      requestId,
+      timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[API:share] Share creation error:', error);
+    console.error(`[API:share:${requestId}] 创建分享时出错:`, error);
     return NextResponse.json({ 
-      error: 'Failed to create share link',
-      detail: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to create share', 
+      detail: error instanceof Error ? error.message : 'Unknown error',
+      requestId,
+      timestamp: Date.now()
     }, { status: 500 });
   }
 }
