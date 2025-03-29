@@ -737,9 +737,18 @@ export async function GET(request: NextRequest) {
     
     // 使用streams发送大文件
     const stream = fs.createReadStream(filePath);
+    const chunks: Uint8Array[] = [];
+    
+    // 读取文件内容到内存
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    
+    // 组合所有块
+    const fileBuffer = Buffer.concat(chunks);
     
     // 返回文件
-    return new NextResponse(stream, {
+    return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': 'audio/wav',
         'Content-Disposition': `attachment; filename="${fileId}.wav"`,
