@@ -16,8 +16,10 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
   const handleShare = async () => {
     if (!fileId) {
       console.error('没有可用的fileId进行分享');
-      toast.error("分享失败", {
-        description: "没有可用的文件进行分享，请先转换文件"
+      toast({
+        title: "分享失败",
+        description: "没有可用的文件进行分享，请先转换文件",
+        variant: "destructive"
       });
       return;
     }
@@ -45,11 +47,12 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
         if (!checkResponse.ok) {
           // 如果文件不存在，则尝试重新获取转换结果
           if (checkResponse.status === 404) {
-            console.warn(`[分享] 文件不存在，尝试重新下载: fileId=${fileId}`);
+            console.log(`[分享] 文件不存在，尝试重新下载: fileId=${fileId}`);
             
             // 推送消息通知用户
-            toast.info("正在准备文件", {
-              description: "文件正在准备中，请稍候..."
+            toast({
+              title: "正在准备文件",
+              description: "文件正在准备中，请稍候...",
             });
             
             try {
@@ -138,8 +141,10 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
       
     } catch (error) {
       console.error('[分享] 分享错误:', error);
-      toast.error("分享失败", {
-        description: error instanceof Error ? error.message : "无法创建分享链接，请重试"
+      toast({
+        title: "分享失败",
+        description: error instanceof Error ? error.message : "无法创建分享链接，请重试",
+        variant: "destructive"
       });
     } finally {
       setIsSharing(false);
