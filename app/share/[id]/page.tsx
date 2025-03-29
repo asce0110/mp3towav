@@ -1,10 +1,17 @@
 import Link from 'next/link';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { SiteHeader } from "@/components/site-header"
 import fs from 'fs';
 import path from 'path';
+import { DebugButtons } from '@/components/debug-buttons';
+import { notFound } from "next/navigation"
+import { getShareData } from "@/lib/share-service"
+import { formatFileSize } from "@/lib/utils"
+import { DownloadButton } from "@/components/download-button"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 // 始终启用客户端调试 - 临时修改，便于排查问题
 const CLIENT_DEBUG = true;
@@ -280,177 +287,73 @@ function DebugPanel({ data }: { data: any }) {
 }
 
 export default async function SharePage({ params }: { params: { id: string } }) {
-  console.log(`[分享页面] 开始渲染分享页面: ID=${params.id}, 类型=${typeof params.id}, 长度=${params.id?.length || 0}`);
+  const id = params.id;
+  console.log(`[分享页面-服务器] 请求分享: ID=${id}`);
   
-  // 验证分享ID参数
-  if (!params.id || !/^[a-zA-Z0-9_-]+$/.test(params.id)) {
-    console.error(`无效的分享ID格式: "${params.id}"`);
-    return (
-      <>
-        <SiteHeader />
-        <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-          <div className="container mx-auto max-w-4xl px-4 py-12">
-            <Card className="w-full max-w-2xl mx-auto bg-white shadow-lg">
-              <CardHeader className="bg-red-500 text-white">
-                <CardTitle className="text-2xl font-bold text-center">
-                  Invalid Share ID
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="text-center space-y-6">
-                  <div className="p-4">
-                    <h3 className="text-xl font-medium mb-2 text-red-500">
-                      Invalid Share URL Format
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      The share URL you're trying to access has an invalid format.
-                    </p>
-                    <Button variant="outline" asChild>
-                      <Link href="/">
-                        Go to MP3 to WAV Converter
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <DebugPanel data={{ params, error: 'invalid_format', success: false }} />
-          </div>
-        </main>
-      </>
-    );
+  // 获取分享数据
+  const shareData = await getShareData(id);
+  console.log(`[分享页面-服务器] 获取到分享数据:`, shareData);
+  
+  // 如果分享不存在或已过期，返回404
+  if (!shareData || !shareData.success) {
+    console.log(`[分享页面-服务器] 分享无效或过期: ${id}`);
+    return notFound();
   }
   
-  const shareData = await getShareData(params.id);
-  const isValid = shareData && shareData.success;
-  
-  console.log(`[分享页面] 分享数据获取结果: 是否有效=${isValid}, 文件名=${shareData?.originalName || 'N/A'}, 错误类型=${shareData?.error || 'none'}`);
-  
-  // 如果分享数据无效，提供更详细的错误信息显示
-  if (!isValid && shareData) {
-    console.error(`[分享页面] 分享无效, 错误类型: ${shareData.error}, 消息: ${shareData.message}, 详情: ${shareData.details || 'none'}`);
-  }
+  // 格式化分享数据
+  const { fileId, originalName, downloadUrl, remainingMinutes } = shareData;
   
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="container mx-auto max-w-4xl px-4 py-12">
-          <Card className="w-full max-w-2xl mx-auto bg-white shadow-lg">
-            <CardHeader className={isValid ? "bg-[#2A6FDB] text-white" : "bg-red-500 text-white"}>
-              <CardTitle className="text-2xl font-bold text-center">
-                {isValid ? "Shared WAV File" : "Shared File Not Available"}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+        <div className="w-full max-w-md mx-auto">
+          <Card className="w-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl font-medium">
+                Shared WAV File
               </CardTitle>
+              <CardDescription>
+                This file will be available for{" "}
+                <Badge variant="secondary" className="font-normal">
+                  {remainingMinutes} minutes
+                </Badge>
+              </CardDescription>
             </CardHeader>
-            
-            <CardContent className="p-6">
-              {isValid ? (
-                <div className="space-y-6 text-center">
-                  <div>
-                    <h3 className="text-xl font-medium mb-2">
-                      {shareData.originalName || 'WAV File'}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {shareData.remainingMinutes !== undefined ? (
-                        shareData.remainingMinutes > 60 
-                          ? `This shared file will expire in ${Math.floor(shareData.remainingMinutes / 60)} hours and ${shareData.remainingMinutes % 60} minutes`
-                          : `This shared file will expire in ${shareData.remainingMinutes} minutes`
-                      ) : 'This shared file will be available for 24 hours'}
-                    </p>
-                  </div>
-                  
-                  <Button
-                    className="bg-[#2A6FDB] hover:bg-[#2A6FDB]/90 w-full"
-                    size="lg"
-                    asChild
-                  >
-                    <a href={shareData.downloadUrl} download>
-                      <Download className="h-5 w-5 mr-2" />
-                      Download WAV File
-                    </a>
-                  </Button>
-                  
-                  <div className="pt-4 border-t mt-6">
-                    <p className="text-sm text-gray-500 mb-4">
-                      Want to convert your own MP3 files?
-                    </p>
-                    <Button variant="outline" asChild>
-                      <Link href="/">
-                        Go to MP3 to WAV Converter
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center space-y-6">
-                  <div className="p-4">
-                    <h3 className="text-xl font-medium mb-2 text-red-500">
-                      Shared File Not Available
-                    </h3>
-                    {shareData && shareData.error === 'expired' ? (
-                      <p className="text-gray-500">
-                        This shared file has expired. Shared files are only available for 24 hours after creation.
-                      </p>
-                    ) : shareData && shareData.error === 'not_found' ? (
-                      <p className="text-gray-500">
-                        This shared file could not be found. It may have been deleted or never existed.
-                      </p>
-                    ) : (
-                      <p className="text-gray-500">
-                        This shared file is not available. {shareData?.message || 'Shared files are available for 24 hours.'}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <Button variant="outline" asChild>
-                    <Link href="/">
-                      Go to MP3 to WAV Converter
-                    </Link>
-                  </Button>
-                </div>
-              )}
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium leading-none">
+                  Original filename
+                </h3>
+                <p className="text-sm text-muted-foreground break-all">
+                  {originalName || "Unknown"}
+                </p>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-3">
+                <DownloadButton 
+                  fileId={fileId} 
+                  downloadUrl={downloadUrl} 
+                  originalName={originalName}
+                />
+              </div>
             </CardContent>
+            <CardFooter className="pt-1 flex justify-between">
+              <Link href="/" passHref>
+                <Button variant="ghost" size="sm">
+                  Back to converter
+                </Button>
+              </Link>
+              
+              {/* 调试按钮在服务器组件中使用 */}
+              <DebugButtons />
+            </CardFooter>
           </Card>
-          
-          <DebugPanel data={{ 
-            params, 
-            ...shareData, 
-            serverTime: new Date().toISOString(),
-            clientTime: typeof window !== 'undefined' ? new Date().toISOString() : null,
-            userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
-          }} />
-          
-          {/* 添加直接检查按钮 */}
-          <div className="mt-4 text-center">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  clientLog('正在手动检查存储...');
-                  window.location.href = `/api/test-share?id=${params.id}&fileId=${shareData?.fileId || ''}&_=${Date.now()}`;
-                }
-              }}
-            >
-              检查存储状态
-            </Button>
-            {' '}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  clientLog('正在强制刷新分享...');
-                  window.location.href = `/api/share?id=${params.id}&debug=true&force=true&_=${Date.now()}`;
-                }
-              }}
-            >
-              强制刷新分享
-            </Button>
-          </div>
         </div>
       </main>
-    </>
+    </div>
   );
 }
 
