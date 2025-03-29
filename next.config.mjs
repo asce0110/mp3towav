@@ -76,11 +76,53 @@ const nextConfig = {
       // 减小chunk大小，避免超过Cloudflare 25MB限制
       config.optimization.splitChunks = {
         chunks: 'all',
-        maxInitialRequests: 25,
-        maxAsyncRequests: 25,
+        maxInitialRequests: 30,
+        maxAsyncRequests: 30,
         minSize: 20000,
-        maxSize: 20 * 1024 * 1024, // 20MB
+        maxSize: 10 * 1024 * 1024, // 减小到10MB
+        cacheGroups: {
+          framework: {
+            name: 'framework',
+            test: /[\\/]node_modules[\\/](react|react-dom|next|scheduler)[\\/]/,
+            priority: 40,
+            chunks: 'all',
+            enforce: true,
+          },
+          libs: {
+            name: 'libs',
+            test: /[\\/]node_modules[\\/]/,
+            priority: 30,
+            chunks: 'all',
+            minChunks: 2,
+          },
+          commons: {
+            name: 'commons',
+            minChunks: 2,
+            priority: 20,
+          },
+          shared: {
+            name: (module, chunks) => {
+              return 'shared-' + 
+                chunks.map(c => c.name).join('-');
+            },
+            priority: 10,
+            minChunks: 2,
+            reuseExistingChunk: true,
+          }
+        }
       };
+      
+      // 优化CSS
+      if (config.optimization.minimizer) {
+        config.optimization.minimizer.push(
+          new (require('css-minimizer-webpack-plugin'))({})
+        );
+      }
+    }
+    
+    // 避免生成source maps减小文件大小
+    if (!dev && !isServer) {
+      config.devtool = false;
     }
     
     return config;

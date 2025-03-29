@@ -7,6 +7,8 @@ node_modules
 .vscode
 tmp/
 .next/cache/
-.next/webpack/
+.next/cache/webpack/
+.next/static/chunks/*.js.map
 **/*.pack
-**/*.map 
+**/*.map
+**/*.pack.old 
