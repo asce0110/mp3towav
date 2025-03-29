@@ -3,7 +3,8 @@ import {
   PutObjectCommand, 
   GetObjectCommand, 
   DeleteObjectCommand,
-  ListObjectsV2Command
+  ListObjectsV2Command,
+  HeadObjectCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import path from 'path';
@@ -165,7 +166,7 @@ export async function fileExistsInR2(key: string): Promise<boolean> {
 
   try {
     console.log(`检查文件是否存在于R2: ${key}`);
-    const command = new GetObjectCommand({
+    const command = new HeadObjectCommand({
       Bucket: r2BucketName,
       Key: key,
     });
@@ -175,6 +176,9 @@ export async function fileExistsInR2(key: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.log(`文件不存在于R2: ${key}`);
+    if (error instanceof Error) {
+      console.log(`错误详情: ${error.name}: ${error.message}`);
+    }
     return false;
   }
 }

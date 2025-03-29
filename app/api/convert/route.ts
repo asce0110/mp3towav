@@ -469,15 +469,51 @@ const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, origina
       
       if (r2Success) {
         console.log(`[API:convert] 文件成功上传到R2: ${r2Key}`);
+        
+        // 额外验证文件是否真的上传成功
+        try {
+          const fileExists = await fileExistsInR2(r2Key);
+          if (fileExists) {
+            console.log(`[API:convert] 已验证文件确实存在于R2: ${r2Key}`);
+          } else {
+            console.error(`[API:convert] 警告：上传返回成功但文件在R2中验证失败: ${r2Key}`);
+            // 重试上传
+            console.log(`[API:convert] 正在重试上传...`);
+            const retrySuccess = await uploadToR2(
+              r2Key,
+              outputBuffer,
+              {
+                'original-name': originalName,
+                'file-id': fileId,
+                'created-at': new Date().toISOString(),
+                'source': 'api-conversion-retry'
+              },
+              'audio/wav'
+            );
+            console.log(`[API:convert] 重试上传结果: ${retrySuccess}`);
+            r2Success = retrySuccess;
+          }
+        } catch (verifyError) {
+          console.error(`[API:convert] 验证R2文件时出错:`, verifyError);
+        }
       } else {
         console.error(`[API:convert] 文件上传到R2失败: ${r2Key}`);
+        // 输出R2配置状态
+        console.log(`[API:convert] R2配置: AccountID=${!!process.env.R2_ACCOUNT_ID}, KeyID=${!!process.env.R2_ACCESS_KEY_ID}, SecretKey=${!!process.env.R2_SECRET_ACCESS_KEY}, BucketName=${process.env.R2_BUCKET_NAME || '未设置'}`);
       }
     } catch (r2Error) {
       console.error('[API:convert] R2上传错误:', r2Error);
+      console.error('[API:convert] 错误详情:', JSON.stringify(r2Error, null, 2));
       r2Success = false;
     }
   } else {
     console.log('[API:convert] R2未配置，跳过上传');
+    console.log('[API:convert] 环境变量状态:', {
+      R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+      R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+      R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || '未设置'
+    });
   }
   
   // 返回响应

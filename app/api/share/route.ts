@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
     
     // 检查本地文件系统
     if (fs.existsSync(localFilePath)) {
-      console.log(`[API:share:${requestId}] 本地文件存在: ${localFilePath}`);
+      const stats = fs.statSync(localFilePath);
+      console.log(`[API:share:${requestId}] 本地文件存在: ${localFilePath}, 大小: ${stats.size} 字节`);
       hasLocalFile = true;
       fileSource = 'local';
     } else {
@@ -201,6 +202,7 @@ export async function POST(request: NextRequest) {
     const r2Key = `wav/${fileId}.wav`;
     if (isR2Configured) {
       try {
+        console.log(`[API:share:${requestId}] 检查R2文件是否存在: ${r2Key}`);
         hasR2File = await fileExistsInR2(r2Key);
         console.log(`[API:share:${requestId}] R2文件检查结果: ${r2Key} 存在=${hasR2File}`);
         if (hasR2File) {
@@ -209,6 +211,15 @@ export async function POST(request: NextRequest) {
       } catch (r2Error) {
         console.error(`[API:share:${requestId}] 检查R2文件出错:`, r2Error);
       }
+    } else {
+      console.log(`[API:share:${requestId}] R2未配置，跳过R2检查`);
+      // 输出环境变量状态
+      console.log(`[API:share:${requestId}] 环境变量状态:`, {
+        R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+        R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+        R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+        R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || '未设置'
+      });
     }
     
     // 如果文件既不在本地也不在R2中，返回错误
@@ -223,10 +234,14 @@ export async function POST(request: NextRequest) {
     }
     
     // 如果文件在本地但不在R2，并且R2已配置，上传到R2
+    let uploadAttempted = false;
     if (hasLocalFile && !hasR2File && isR2Configured) {
       try {
         console.log(`[API:share:${requestId}] 尝试将本地文件上传到R2: ${r2Key}`);
         const fileBuffer = fs.readFileSync(localFilePath);
+        uploadAttempted = true;
+        
+        console.log(`[API:share:${requestId}] 文件读取成功，大小: ${fileBuffer.length} 字节，开始上传...`);
         const uploadSuccess = await uploadToR2(
           r2Key,
           fileBuffer,
@@ -240,14 +255,53 @@ export async function POST(request: NextRequest) {
         
         if (uploadSuccess) {
           console.log(`[API:share:${requestId}] 文件成功上传到R2: ${r2Key}`);
-          fileSource = 'both';
-          hasR2File = true;
+          
+          // 再次验证文件是否确实存在于R2
+          const verifyExists = await fileExistsInR2(r2Key);
+          if (verifyExists) {
+            console.log(`[API:share:${requestId}] 已验证文件确实存在于R2: ${r2Key}`);
+            fileSource = 'both';
+            hasR2File = true;
+          } else {
+            console.error(`[API:share:${requestId}] 警告：上传成功但文件在R2中不存在: ${r2Key}`);
+            // 重试上传
+            console.log(`[API:share:${requestId}] 重试上传...`);
+            const retrySuccess = await uploadToR2(
+              r2Key,
+              fileBuffer,
+              {
+                'source': 'share-api-retry',
+                'request-id': requestId,
+                'original-name': originalName || `${fileId}.wav`,
+                'retry': 'true'
+              },
+              'audio/wav'
+            );
+            
+            if (retrySuccess) {
+              const retryVerify = await fileExistsInR2(r2Key);
+              if (retryVerify) {
+                console.log(`[API:share:${requestId}] 重试上传成功，文件现在存在于R2: ${r2Key}`);
+                fileSource = 'both';
+                hasR2File = true;
+              } else {
+                console.error(`[API:share:${requestId}] 重试上传失败，文件在R2中仍然不存在: ${r2Key}`);
+              }
+            } else {
+              console.error(`[API:share:${requestId}] 重试上传失败: ${r2Key}`);
+            }
+          }
         } else {
           console.warn(`[API:share:${requestId}] 文件上传到R2失败: ${r2Key}`);
         }
       } catch (uploadError) {
         console.error(`[API:share:${requestId}] 上传到R2时出错:`, uploadError);
       }
+    }
+    
+    // 如果上传失败或未上传到R2，提醒用户
+    if (uploadAttempted && !hasR2File && isR2Configured) {
+      console.warn(`[API:share:${requestId}] 文件未能上传到R2，将仅使用本地存储: ${fileId}`);
     }
     
     // 如果文件在R2但不在本地，下载到本地
@@ -263,7 +317,7 @@ export async function POST(request: NextRequest) {
         const fileBuffer = await downloadFromR2(r2Key);
         if (fileBuffer) {
           fs.writeFileSync(localFilePath, fileBuffer);
-          console.log(`[API:share:${requestId}] 文件已从R2下载到本地: ${localFilePath}`);
+          console.log(`[API:share:${requestId}] 文件已从R2下载到本地: ${localFilePath}, 大小: ${fileBuffer.length} 字节`);
           hasLocalFile = true;
           fileSource = 'both';
         } else {
@@ -604,4 +658,5 @@ export async function OPTIONS(request: NextRequest) {
       'Access-Control-Max-Age': '86400'
     }
   });
+} 
 } 
