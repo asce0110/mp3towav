@@ -704,20 +704,102 @@ export function MP3toWAVConverter() {
       try {
         // 创建FormData
         const formData = new FormData();
-        formData.append('file', blob, `${originalName || 'converted'}.wav`);
-        formData.append('clientFileId', clientFileId);
         
-        // 静默上传到服务器以支持分享功能
-        fetch('/api/upload-client-wav', {
-          method: 'POST',
-          body: formData
-        }).then(response => {
-          if (response.ok) {
-            console.log('Client-converted WAV uploaded to server for sharing');
+        // 检查文件大小，如果超过5MB，添加标志
+        const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+        const isLargeFile = blob.size > MAX_SIZE;
+        
+        if (isLargeFile) {
+          console.log(`大文件检测: ${blob.size} 字节，将执行分块上传`);
+          
+          // 创建文件切片
+          let chunks = [];
+          let start = 0;
+          
+          while (start < blob.size) {
+            const end = Math.min(start + MAX_SIZE, blob.size);
+            chunks.push(blob.slice(start, end));
+            start = end;
           }
-        }).catch(err => {
-          console.error('Failed to upload client-converted WAV:', err);
-        });
+          
+          console.log(`文件分块: 总计 ${chunks.length} 个分块`);
+          
+          // 顺序上传所有分块
+          let allChunksUploaded = true;
+          
+          for (let i = 0; i < chunks.length; i++) {
+            const chunkFormData = new FormData();
+            chunkFormData.append('file', chunks[i], `${originalName || 'converted'}.part${i}`);
+            chunkFormData.append('clientFileId', clientFileId);
+            chunkFormData.append('chunkIndex', String(i));
+            chunkFormData.append('totalChunks', String(chunks.length));
+            chunkFormData.append('originalName', originalName || 'converted.wav');
+            
+            try {
+              const response = await fetch('/api/upload-chunk', {
+                method: 'POST',
+                body: chunkFormData
+              });
+              
+              if (!response.ok) {
+                console.error(`分块 ${i} 上传失败: ${response.status}`);
+                allChunksUploaded = false;
+                break;
+              }
+              
+              setProgress(Math.min(90, Math.round((i + 1) / chunks.length * 90)));
+              console.log(`分块 ${i + 1}/${chunks.length} 上传成功`);
+            } catch (chunkError) {
+              console.error(`分块 ${i} 上传出错:`, chunkError);
+              allChunksUploaded = false;
+              break;
+            }
+          }
+          
+          // 如果所有分块上传成功，通知服务器合并文件
+          if (allChunksUploaded) {
+            try {
+              const mergeResponse = await fetch('/api/merge-chunks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  clientFileId,
+                  totalChunks: chunks.length,
+                  fileName: `${originalName || 'converted'}.wav`
+                })
+              });
+              
+              if (mergeResponse.ok) {
+                const mergeData = await mergeResponse.json();
+                console.log('分块合并成功:', mergeData);
+              } else {
+                console.error('分块合并失败:', await mergeResponse.text());
+              }
+            } catch (mergeError) {
+              console.error('合并请求出错:', mergeError);
+            }
+          }
+        } else {
+          // 小文件直接上传
+          formData.append('file', blob, `${originalName || 'converted'}.wav`);
+          formData.append('clientFileId', clientFileId);
+          
+          // 静默上传到服务器以支持分享功能
+          try {
+            const response = await fetch('/api/upload-client-wav', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (response.ok) {
+              console.log('Client-converted WAV uploaded to server for sharing');
+            } else {
+              console.error('上传失败:', response.status, await response.text());
+            }
+          } catch (err) {
+            console.error('Failed to upload client-converted WAV:', err);
+          }
+        }
       } catch (uploadError) {
         console.error('Error preparing upload:', uploadError);
       }
