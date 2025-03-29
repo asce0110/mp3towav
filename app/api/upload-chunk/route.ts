@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
@@ -9,6 +9,16 @@ const CHUNKS_DIR = path.join(TMP_DIR, 'chunks');
 
 // 最大分块大小限制 (10MB)
 const MAX_CHUNK_SIZE = 10 * 1024 * 1024;
+
+// 定义元数据类型接口
+interface ChunkMetadata {
+  clientFileId: string;
+  originalName: string;
+  totalChunks: number;
+  receivedChunks: number[];
+  createdAt: string;
+  lastUpdated: string;
+}
 
 // 确保临时目录存在
 async function ensureDirs() {
@@ -86,7 +96,7 @@ export async function POST(request: NextRequest) {
     
     // 创建或更新元数据文件
     const metadataPath = path.join(clientChunksDir, 'metadata.json');
-    const metadata = {
+    const metadata: ChunkMetadata = {
       clientFileId,
       originalName,
       totalChunks: parseInt(totalChunks, 10),
@@ -98,7 +108,8 @@ export async function POST(request: NextRequest) {
     // 如果元数据文件已存在，则读取并更新
     try {
       if (existsSync(metadataPath)) {
-        const existingMetadata = require(metadataPath);
+        const existingMetadataText = await readFile(metadataPath, 'utf8');
+        const existingMetadata = JSON.parse(existingMetadataText) as ChunkMetadata;
         metadata.receivedChunks = existingMetadata.receivedChunks || [];
         metadata.createdAt = existingMetadata.createdAt;
       }
@@ -108,8 +119,9 @@ export async function POST(request: NextRequest) {
     }
     
     // 添加当前块索引到已接收列表（如果不存在）
-    if (!metadata.receivedChunks.includes(parseInt(chunkIndex, 10))) {
-      metadata.receivedChunks.push(parseInt(chunkIndex, 10));
+    const chunkIndexNum = parseInt(chunkIndex, 10);
+    if (!metadata.receivedChunks.includes(chunkIndexNum)) {
+      metadata.receivedChunks.push(chunkIndexNum);
     }
     metadata.lastUpdated = new Date().toISOString();
     
@@ -121,7 +133,7 @@ export async function POST(request: NextRequest) {
     console.log(`[API:upload-chunk:${requestId}] 处理完成，返回成功响应`);
     return NextResponse.json({ 
       success: true, 
-      chunkIndex: parseInt(chunkIndex, 10),
+      chunkIndex: chunkIndexNum,
       receivedChunks: metadata.receivedChunks.length,
       totalChunks: metadata.totalChunks,
       isComplete: metadata.receivedChunks.length === metadata.totalChunks,

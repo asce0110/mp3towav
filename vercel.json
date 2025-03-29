@@ -4,11 +4,19 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "functions": {
-    "api/upload-client-wav/*.js": {
+    "app/api/upload-client-wav/route.js": {
       "maxDuration": 60,
       "memory": 1024
     },
-    "api/*.js": {
+    "app/api/upload-chunk/route.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/merge-chunks/route.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/*/route.js": {
       "maxDuration": 60
     }
   },

@@ -8,6 +8,16 @@ import { uploadToR2, isR2Configured } from '@/lib/r2';
 const TMP_DIR = path.join(process.cwd(), 'tmp');
 const CHUNKS_DIR = path.join(TMP_DIR, 'chunks');
 
+// 定义元数据类型接口
+interface ChunkMetadata {
+  clientFileId: string;
+  originalName: string;
+  totalChunks: number;
+  receivedChunks: number[];
+  createdAt: string;
+  lastUpdated: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 生成唯一请求ID用于日志跟踪
@@ -42,7 +52,7 @@ export async function POST(request: NextRequest) {
     
     // 解析元数据
     const metadataContent = await readFile(metadataPath, 'utf8');
-    let metadata;
+    let metadata: ChunkMetadata;
     try {
       metadata = JSON.parse(metadataContent);
     } catch (jsonError) {
