@@ -413,13 +413,49 @@ export function MP3toWAVConverter() {
           // 强制将转换完成标志设置为true，确保UI显示下载和分享按钮
           setIsConverting(false);
           
+          // 设置音频持续时间 - 使用保存的时长或默认值
+          const duration = state.audioDuration || 180;
+          setAudioDuration(duration);
+          
+          // 更新修剪设置以匹配音频持续时间
+          setSettings(prev => ({
+            ...prev,
+            trimStart: 0,
+            trimEnd: duration
+          }));
+          
           // 创建一个模拟的File对象，这样UI会认为有文件被选择
+          // 添加一个合理的文件大小，而不是空内容
           if (state.fileName) {
-            const dummyFile = new File(["dummy content"], state.fileName, { 
+            // 创建一个带有合理大小的模拟文件
+            const dummySize = state.fileSize || 20 * 1024 * 1024; // 使用保存的大小或默认20MB
+            const dummyContent = new ArrayBuffer(10); // 实际内容很小，但我们会覆盖size属性
+            const dummyBlob = new Blob([dummyContent], { type: "audio/mp3" });
+            
+            // 创建自定义File对象
+            const dummyFile = new File([dummyBlob], state.fileName, { 
               type: "audio/mp3",
               lastModified: Date.now()
             });
+            
+            // 使用Object.defineProperty覆盖size属性
+            Object.defineProperty(dummyFile, 'size', {
+              value: dummySize,
+              writable: false
+            });
+            
             setFile(dummyFile);
+            
+            // 生成波形数据以显示音频波形
+            const mockWaveform = Array.from({ length: 200 }, (_, i) => {
+              // 使用正弦函数创建更真实的波形模式
+              return (Math.sin(i * 0.1) * 0.3 + 0.5) * 0.8 + Math.random() * 0.2;
+            });
+            
+            setWaveformData(mockWaveform);
+            setTimeout(() => {
+              drawWaveform(mockWaveform);
+            }, 100);
           }
           
           // 显示提示

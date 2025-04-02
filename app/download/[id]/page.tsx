@@ -255,15 +255,26 @@ export default function DownloadPage() {
                             if (storedData) {
                               const downloadData = JSON.parse(storedData);
                               
+                              // 估算文件大小 - WAV文件通常比MP3大约大10倍
+                              // 这里我们使用一个合理的默认大小
+                              const estimatedSize = 20 * 1024 * 1024; // 20MB
+                              
                               // 存储转换完成的状态信息 - 使用下载数据中的fileId或者当前fileId
                               sessionStorage.setItem('converterState', JSON.stringify({
                                 fileId: fileId || params.id, // 优先使用fileId
                                 downloadUrl,
                                 fileName,
+                                fileSize: estimatedSize,
+                                audioDuration: 180, // 默认音频长度为3分钟
                                 keepState: true
                               }));
                               
-                              console.log('成功保存转换状态用于返回:', { fileId: fileId || params.id, downloadUrl });
+                              console.log('成功保存转换状态用于返回:', { 
+                                fileId: fileId || params.id, 
+                                downloadUrl,
+                                fileName,
+                                fileSize: estimatedSize 
+                              });
                             } else {
                               console.error('无法找到原始下载数据');
                             }
