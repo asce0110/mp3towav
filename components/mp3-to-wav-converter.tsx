@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import { ShareButton } from './share-button'
+import { addHistoryItem } from '@/lib/history-service';
 
 // Mock function to simulate conversion process
 const convertFile = async (file: File, settings: ConversionSettings, onProgress: (progressUpdater: (prev: number) => number) => void): Promise<{ fileId: string, shareId: string, originalName: string, ffmpegAvailable: boolean, url?: string, r2Success?: boolean, storedInR2?: boolean }> => {
@@ -393,6 +394,37 @@ export function MP3toWAVConverter() {
     }
   }, [])
 
+  // 从sessionStorage恢复转换状态
+  useEffect(() => {
+    try {
+      // 检查是否有保存的转换状态
+      const savedState = sessionStorage.getItem('converterState');
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        console.log('从会话存储中恢复转换状态:', state);
+        
+        // 只有当明确标记为保持状态时才恢复
+        if (state.keepState) {
+          // 恢复状态
+          setFileId(state.fileId);
+          setDownloadUrl(state.downloadUrl);
+          setOriginalName(state.fileName);
+          
+          // 显示提示
+          toast({
+            title: "返回转换器",
+            description: "已恢复您的转换结果，您可以继续分享或下载。",
+          });
+          
+          // 清除sessionStorage中的状态，防止页面刷新后重复恢复
+          sessionStorage.removeItem('converterState');
+        }
+      }
+    } catch (error) {
+      console.error('恢复转换状态失败:', error);
+    }
+  }, []);
+
   // 修改isValidMP3File函数，使其更严格
   const isValidMP3File = (file: File): boolean => {
     console.log("Validating file:", file.name, file.type);
@@ -623,7 +655,31 @@ export function MP3toWAVConverter() {
     }
   };
 
-  // Add client-side conversion function that doesn't depend on server-side conversion
+  // 在成功转换后添加历史记录
+  const addToHistory = (fileId: string, originalName: string, storageType: string) => {
+    try {
+      const now = Date.now();
+      const expiresAt = now + 24 * 60 * 60 * 1000; // 24小时后过期
+      
+      addHistoryItem({
+        id: `history-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        fileId,
+        originalName,
+        convertedAt: now,
+        expiresAt,
+        storageType: storageType as any,
+        shareId: shareId || undefined,
+        fileSize: file?.size,
+        settings: { ...settings }
+      });
+      
+      console.log('已添加到历史记录:', fileId);
+    } catch (error) {
+      console.error('添加历史记录失败:', error);
+    }
+  };
+
+  // 修改客户端转换
   const handleClientSideConversion = async () => {
     if (!file) return;
     
@@ -700,108 +756,27 @@ export function MP3toWAVConverter() {
       const clientFileId = generateUniqueId();
       setFileId(clientFileId);
       
-      // 上传至服务器（可选）
+      // 上传至服务器，但不上传到R2（只保存本地）
       try {
         // 创建FormData
         const formData = new FormData();
+        formData.append('file', blob, `${originalName || 'converted'}.wav`);
+        formData.append('clientFileId', clientFileId);
+        formData.append('skipR2Upload', 'true'); // 标记跳过R2上传
         
-        // 检查文件大小，如果超过5MB，添加标志
-        const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-        const isLargeFile = blob.size > MAX_SIZE;
-        
-        if (isLargeFile) {
-          console.log(`大文件检测: ${blob.size} 字节，将执行分块上传`);
-          
-          // 创建文件切片
-          let chunks = [];
-          let start = 0;
-          
-          while (start < blob.size) {
-            const end = Math.min(start + MAX_SIZE, blob.size);
-            chunks.push(blob.slice(start, end));
-            start = end;
+        // 静默上传到服务器
+        fetch('/api/upload-client-wav', {
+          method: 'POST',
+          body: formData
+        }).then(response => {
+          if (response.ok) {
+            console.log('客户端转换的WAV上传到服务器成功（仅本地存储）');
           }
-          
-          console.log(`文件分块: 总计 ${chunks.length} 个分块`);
-          
-          // 顺序上传所有分块
-          let allChunksUploaded = true;
-          
-          for (let i = 0; i < chunks.length; i++) {
-            const chunkFormData = new FormData();
-            chunkFormData.append('file', chunks[i], `${originalName || 'converted'}.part${i}`);
-            chunkFormData.append('clientFileId', clientFileId);
-            chunkFormData.append('chunkIndex', String(i));
-            chunkFormData.append('totalChunks', String(chunks.length));
-            chunkFormData.append('originalName', originalName || 'converted.wav');
-            
-            try {
-              const response = await fetch('/api/upload-chunk', {
-                method: 'POST',
-                body: chunkFormData
-              });
-              
-              if (!response.ok) {
-                console.error(`分块 ${i} 上传失败: ${response.status}`);
-                allChunksUploaded = false;
-                break;
-              }
-              
-              setProgress(Math.min(90, Math.round((i + 1) / chunks.length * 90)));
-              console.log(`分块 ${i + 1}/${chunks.length} 上传成功`);
-            } catch (chunkError) {
-              console.error(`分块 ${i} 上传出错:`, chunkError);
-              allChunksUploaded = false;
-              break;
-            }
-          }
-          
-          // 如果所有分块上传成功，通知服务器合并文件
-          if (allChunksUploaded) {
-            try {
-              const mergeResponse = await fetch('/api/merge-chunks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  clientFileId,
-                  totalChunks: chunks.length,
-                  fileName: `${originalName || 'converted'}.wav`
-                })
-              });
-              
-              if (mergeResponse.ok) {
-                const mergeData = await mergeResponse.json();
-                console.log('分块合并成功:', mergeData);
-              } else {
-                console.error('分块合并失败:', await mergeResponse.text());
-              }
-            } catch (mergeError) {
-              console.error('合并请求出错:', mergeError);
-            }
-          }
-        } else {
-          // 小文件直接上传
-          formData.append('file', blob, `${originalName || 'converted'}.wav`);
-          formData.append('clientFileId', clientFileId);
-          
-          // 静默上传到服务器以支持分享功能
-          try {
-            const response = await fetch('/api/upload-client-wav', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (response.ok) {
-              console.log('Client-converted WAV uploaded to server for sharing');
-            } else {
-              console.error('上传失败:', response.status, await response.text());
-            }
-          } catch (err) {
-            console.error('Failed to upload client-converted WAV:', err);
-          }
-        }
+        }).catch(err => {
+          console.error('上传客户端转换的WAV失败:', err);
+        });
       } catch (uploadError) {
-        console.error('Error preparing upload:', uploadError);
+        console.error('准备上传时出错:', uploadError);
       }
       
       setProgress(100);
@@ -818,10 +793,13 @@ export function MP3toWAVConverter() {
         audioRef.current.src = url;
       }
       
+      // 添加到历史记录
+      addToHistory(clientFileId, originalName || file.name, 'local');
+      
       // Notify user
       toast({
-        title: "Conversion Complete",
-        description: "MP3 has been converted to WAV. You can download it now.",
+        title: "转换完成",
+        description: "MP3已成功转换为WAV。如需分享，请点击分享按钮上传到云端。",
       });
       
       // Update state
@@ -909,7 +887,7 @@ export function MP3toWAVConverter() {
     }
   }
 
-  // Modify server-side conversion function
+  // 修改服务器转换
   const handleServerConversion = async () => {
     if (!file) return;
     
@@ -917,12 +895,30 @@ export function MP3toWAVConverter() {
       setIsConverting(true);
       setProgress(0);
       
+      // 修改API调用，添加skipR2Upload参数
+      // 创建FormData对象
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('volume', settings.volume.toString());
+      formData.append('sampleRate', settings.sampleRate);
+      formData.append('channels', settings.channels);
+      formData.append('bitDepth', settings.bitDepth);
+      formData.append('trimStart', settings.trimStart.toString());
+      formData.append('trimEnd', settings.trimEnd.toString());
+      formData.append('skipR2Upload', 'true'); // 添加这个参数
+      
       // Call conversion API
-      const data = await convertFile(file, settings, (updater) => {
-        setProgress(updater(progress));
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        body: formData
       });
       
-      console.log('Server conversion complete, returned data:', data);
+      if (!response.ok) {
+        throw new Error(`服务器返回错误: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('服务器转换完成，返回数据:', data);
       
       // Update download URL and other states
       if (data) {
@@ -932,34 +928,23 @@ export function MP3toWAVConverter() {
         setDownloadUrl(data.url || `/api/convert?fileId=${data.fileId}`);
         setFfmpegAvailable(data.ffmpegAvailable);
         
-        // 检查是否成功上传到R2
-        if (data.r2Success) {
-          console.log('文件已成功上传到R2存储');
-          toast({
-            title: "转换完成",
-            description: "MP3已成功转换为WAV，并已存储在云端，可以安全分享。",
-          });
-        } else if (data.storedInR2) {
-          console.log('文件已存储在R2中');
-          toast({
-            title: "转换完成",
-            description: "MP3已成功转换为WAV，并已存储在云端，可以安全分享。",
-          });
-        } else {
-          console.log('文件未上传到R2，仅保存在本地');
-          toast({
-            title: "转换完成",
-            description: "MP3已成功转换为WAV。注意：文件仅存储在本地，分享链接可能在24小时后失效。",
-          });
-        }
+        // 添加到历史记录
+        const storageType = 'local'; // 现在始终为local，因为我们跳过了R2上传
+        addToHistory(data.fileId, file.name, storageType);
+        
+        // 更新提示消息
+        toast({
+          title: "转换完成",
+          description: "MP3已成功转换为WAV。如需分享，请点击分享按钮上传到云端。",
+        });
         
         setProgress(100);
       }
     } catch (error) {
-      console.error('Server conversion failed:', error);
+      console.error('服务器转换失败:', error);
       toast({
-        title: "Conversion Failed",
-        description: String(error) || "Please try again or try another file.",
+        title: "转换失败",
+        description: String(error) || "请重试或尝试使用另一个文件。",
         variant: "destructive",
       });
       setProgress(0);

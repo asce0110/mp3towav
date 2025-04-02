@@ -242,7 +242,26 @@ export default function DownloadPage() {
                       <Button 
                         variant="outline"
                         className="w-full"
-                        onClick={() => router.push('/')}
+                        onClick={() => {
+                          // 将转换状态信息存储到会话存储中
+                          try {
+                            if (params.id && downloadUrl) {
+                              // 存储转换完成的状态信息
+                              sessionStorage.setItem('converterState', JSON.stringify({
+                                fileId: params.id,
+                                downloadUrl,
+                                fileName,
+                                keepState: true
+                              }));
+                              console.log('保存转换状态用于返回:', { fileId: params.id, downloadUrl });
+                            }
+                          } catch (error) {
+                            console.error('保存转换状态失败:', error);
+                          }
+                          
+                          // 返回到转换器页面
+                          router.push('/');
+                        }}
                       >
                         <Home className="h-5 w-5 mr-2" />
                         Return to Converter
