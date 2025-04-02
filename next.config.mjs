@@ -1,4 +1,9 @@
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 在ES模块中获取当前文件路径
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let userConfig = undefined
 try {
