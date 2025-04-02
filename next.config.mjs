@@ -56,7 +56,7 @@ const nextConfig = {
   productionBrowserSourceMaps: false, // 禁用源码映射
   
   // 压缩和减小构建大小
-  webpack: (config, { dev, isServer, webpack }) => {
+  webpack: async (config, { dev, isServer, webpack }) => {
     // 仅在生产环境下优化
     if (!dev) {
       // 启用最大化压缩
@@ -112,7 +112,8 @@ const nextConfig = {
       
       // 优化CSS
       if (!isServer) {
-        const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
+        // 使用动态导入替代require
+        const CssMinimizerPlugin = (await import('css-minimizer-webpack-plugin')).default;
         if (!config.optimization.minimizer) {
           config.optimization.minimizer = [];
         }
