@@ -1,3 +1,5 @@
+import path from 'path';
+
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
@@ -46,7 +48,6 @@ const nextConfig = {
   
   // Cloudflare Pages配置
   output: 'standalone',
-  swcMinify: true, // 使用SWC压缩
   productionBrowserSourceMaps: false, // 禁用源码映射
   
   // 压缩和减小构建大小
