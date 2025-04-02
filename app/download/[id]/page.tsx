@@ -16,6 +16,7 @@ export default function DownloadPage() {
   const [fileName, setFileName] = useState("")
   const [downloadUrl, setDownloadUrl] = useState("")
   const [shareId, setShareId] = useState("")
+  const [fileId, setFileId] = useState("")
   const [downloadStarted, setDownloadStarted] = useState(false)
   
   // Fetch download data on page load
@@ -41,6 +42,8 @@ export default function DownloadPage() {
         setFileName(downloadData.fileName)
         setDownloadUrl(downloadData.url)
         setShareId(downloadData.shareId || "")
+        setFileId(downloadData.fileId || id)
+        console.log('从sessionStorage加载下载数据:', downloadData)
         setIsLoading(false)
       } catch (error) {
         console.error("Error fetching download data:", error)
@@ -245,15 +248,24 @@ export default function DownloadPage() {
                         onClick={() => {
                           // 将转换状态信息存储到会话存储中
                           try {
-                            if (params.id && downloadUrl) {
-                              // 存储转换完成的状态信息
+                            console.log('尝试保存转换状态:', { downloadId: params.id, fileId, downloadUrl, fileName });
+                            
+                            // 从sessionStorage获取原始downloadData，提取更多信息
+                            const storedData = sessionStorage.getItem(`download_${params.id}`);
+                            if (storedData) {
+                              const downloadData = JSON.parse(storedData);
+                              
+                              // 存储转换完成的状态信息 - 使用下载数据中的fileId或者当前fileId
                               sessionStorage.setItem('converterState', JSON.stringify({
-                                fileId: params.id,
+                                fileId: fileId || params.id, // 优先使用fileId
                                 downloadUrl,
                                 fileName,
                                 keepState: true
                               }));
-                              console.log('保存转换状态用于返回:', { fileId: params.id, downloadUrl });
+                              
+                              console.log('成功保存转换状态用于返回:', { fileId: fileId || params.id, downloadUrl });
+                            } else {
+                              console.error('无法找到原始下载数据');
                             }
                           } catch (error) {
                             console.error('保存转换状态失败:', error);

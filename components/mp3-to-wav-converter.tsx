@@ -410,6 +410,18 @@ export function MP3toWAVConverter() {
           setDownloadUrl(state.downloadUrl);
           setOriginalName(state.fileName);
           
+          // 强制将转换完成标志设置为true，确保UI显示下载和分享按钮
+          setIsConverting(false);
+          
+          // 创建一个模拟的File对象，这样UI会认为有文件被选择
+          if (state.fileName) {
+            const dummyFile = new File(["dummy content"], state.fileName, { 
+              type: "audio/mp3",
+              lastModified: Date.now()
+            });
+            setFile(dummyFile);
+          }
+          
           // 显示提示
           toast({
             title: "返回转换器",
@@ -1091,9 +1103,12 @@ export function MP3toWAVConverter() {
     // 存储下载信息到sessionStorage
     const downloadData = {
       fileName: originalName || 'converted.wav',
-      url: downloadUrl
+      url: downloadUrl,
+      fileId: fileId,  // 保存文件ID，用于返回时恢复状态
+      shareId: shareId // 保存分享ID，如果有的话
     };
     
+    console.log('保存下载数据到sessionStorage:', downloadData);
     sessionStorage.setItem(`download_${downloadId}`, JSON.stringify(downloadData));
     
     // 跳转到下载页面
