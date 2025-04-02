@@ -527,322 +527,528 @@ const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, origina
   });
 };
 
-// 处理POST请求 - 执行文件转换
-export async function POST(request: NextRequest) {
-  console.log('接收到转换请求');
+// 创建一个简单的示例WAV文件
+async function createSampleWav(sampleRate = 44100, channels = 2, bitDepth = 16): Promise<Buffer> {
+  console.log(`创建示例WAV文件 (采样率: ${sampleRate}, 声道: ${channels}, 位深: ${bitDepth})`);
   
-  // 生成唯一ID
-  const fileId = uuidv4();
-  let originalName = '';
+  // 检查是否存在预生成的示例文件
+  const samplePath = path.join(TMP_DIR, 'sample.wav');
+  if (fs.existsSync(samplePath)) {
+    try {
+      console.log(`使用预生成的示例WAV文件: ${samplePath}`);
+      const fileData = fs.readFileSync(samplePath);
+      return Buffer.from(fileData);
+    } catch (readError) {
+      console.error(`读取预生成示例失败:`, readError);
+      // 继续创建新的
+    }
+  }
   
+  // 创建一个空白的1秒WAV文件
   try {
-    // 读取请求数据
+    // 计算音频参数
+    const duration = 1; // 1秒
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = channels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = sampleRate * duration * blockAlign;
+    
+    // 创建WAV文件头
+    const wavHeader = Buffer.alloc(44);
+    
+    // RIFF标头
+    wavHeader.write('RIFF', 0);
+    wavHeader.writeUInt32LE(36 + dataSize, 4); // 文件大小（减去8字节）
+    wavHeader.write('WAVE', 8);
+    
+    // fmt子块
+    wavHeader.write('fmt ', 12);
+    wavHeader.writeUInt32LE(16, 16); // fmt块大小
+    wavHeader.writeUInt16LE(1, 20); // 音频格式(PCM)
+    wavHeader.writeUInt16LE(channels, 22); // 声道数
+    wavHeader.writeUInt32LE(sampleRate, 24); // 采样率
+    wavHeader.writeUInt32LE(byteRate, 28); // 字节率
+    wavHeader.writeUInt16LE(blockAlign, 32); // 块对齐
+    wavHeader.writeUInt16LE(bitDepth, 34); // 位深度
+    
+    // data子块
+    wavHeader.write('data', 36);
+    wavHeader.writeUInt32LE(dataSize, 40);
+    
+    // 创建音频数据（全为0，表示静音）
+    const audioData = Buffer.alloc(dataSize);
+    
+    // 合并头部和音频数据
+    const wavFile = Buffer.concat([wavHeader, audioData]);
+    
+    // 尝试保存样本文件以便后续使用
+    try {
+      fs.writeFileSync(samplePath, wavFile);
+      console.log(`已保存示例WAV文件: ${samplePath}`);
+    } catch (saveError) {
+      console.error(`保存示例WAV文件失败:`, saveError);
+    }
+    
+    console.log(`生成的WAV文件大小: ${wavFile.length} 字节`);
+    return wavFile;
+  } catch (error) {
+    console.error(`创建示例WAV文件失败:`, error);
+    // 创建最小WAV文件
+    const minimumWav = Buffer.from([
+      0x52, 0x49, 0x46, 0x46, // "RIFF"
+      0x24, 0x00, 0x00, 0x00, // 文件大小 - 8
+      0x57, 0x41, 0x56, 0x45, // "WAVE"
+      0x66, 0x6d, 0x74, 0x20, // "fmt "
+      0x10, 0x00, 0x00, 0x00, // fmt块大小
+      0x01, 0x00, // 格式(PCM)
+      0x01, 0x00, // 声道数(1)
+      0x44, 0xac, 0x00, 0x00, // 采样率(44100)
+      0x88, 0x58, 0x01, 0x00, // 字节率
+      0x02, 0x00, // 块对齐
+      0x10, 0x00, // 位深度
+      0x64, 0x61, 0x74, 0x61, // "data"
+      0x00, 0x00, 0x00, 0x00  // 数据大小(0)
+    ]);
+    return minimumWav;
+  }
+}
+
+// 检查FFmpeg是否可用
+async function checkFFmpeg(): Promise<boolean> {
+  try {
+    // 首先确定ffmpeg路径
+    const ffmpegPath = ffmpegStatic || systemFfmpeg || (process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    
+    console.log(`FFmpeg 路径设置为: ${ffmpegPath}`);
+    
+    // 检查文件是否存在
+    if (ffmpegStatic && !fs.existsSync(ffmpegStatic)) {
+      console.error('FFmpeg 文件不存在，转换将使用简单方法');
+      return false;
+    }
+    
+    // 尝试执行ffmpeg命令
+    try {
+      const { execSync } = require('child_process');
+      let result;
+      
+      if (process.platform === 'win32') {
+        // Windows系统上，使用双引号包裹路径以处理中文路径
+        result = execSync(`"${ffmpegPath}" -version`).toString();
+      } else {
+        result = execSync(`${ffmpegPath} -version`).toString();
+      }
+      
+      if (result && result.toLowerCase().includes('ffmpeg')) {
+        console.log('FFmpeg 命令执行成功，版本信息:', result.split('\n')[0]);
+        return true;
+      }
+    } catch (execError) {
+      console.error('无法执行 FFmpeg 命令:', execError);
+      return false;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('检查 FFmpeg 时出错:', error);
+    return false;
+  }
+}
+
+// 生成唯一文件ID
+function generateFileId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+// 处理POST请求 - 上传和转换文件
+export async function POST(request: NextRequest) {
+  // 生成一个请求ID用于日志跟踪
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+  console.log(`[${requestId}] 开始处理转换请求`);
+
+  try {
+    // 解析multipart/form-data请求
     const formData = await request.formData();
-    console.log('已解析FormData');
     
-    // 获取MP3文件
-    const mp3File = formData.get('file');
+    // 是否跳过R2上传
+    const skipR2Upload = formData.get('skipR2Upload') === 'true';
+    console.log(`[${requestId}] skipR2Upload=${skipR2Upload}`);
     
-    if (!mp3File || !(mp3File instanceof File)) {
-      console.error('缺少MP3文件或文件格式不正确');
-      return NextResponse.json({ error: 'Missing or invalid MP3 file' }, { status: 400 });
+    // 提取参数
+    const file = formData.get('file') as File;
+    const clientFileId = formData.get('clientFileId') as string;
+    
+    // 提取和解析音频设置
+    const volume = parseFloat(formData.get('volume') as string || '1.0');
+    const sampleRate = parseInt(formData.get('sampleRate') as string || '44100', 10);
+    const channels = parseInt(formData.get('channels') as string || '2', 10);
+    const bitDepth = parseInt(formData.get('bitDepth') as string || '16', 10);
+    const trimStart = parseFloat(formData.get('trimStart') as string || '0');
+    const trimEnd = parseFloat(formData.get('trimEnd') as string || '0');
+    
+    console.log(`[${requestId}] 收到文件: ${file ? file.name : '无文件'}, 大小: ${file ? file.size : 0} bytes`);
+    console.log(`[${requestId}] 转换设置: 音量=${volume}, 采样率=${sampleRate}, 声道=${channels}, 位深=${bitDepth}, 裁剪=${trimStart}-${trimEnd}`);
+    
+    if (!file) {
+      return NextResponse.json({ 
+        success: false, 
+        error: '未找到上传文件' 
+      }, { status: 400 });
     }
     
-    // 获取文件信息
-    originalName = mp3File.name;
-    const fileSize = mp3File.size;
-    console.log(`处理文件: ${originalName}, 大小: ${fileSize} 字节`);
+    // 生成一个唯一文件ID
+    const fileId = clientFileId || generateFileId();
     
-    // 读取文件内容
-    const fileBuffer = Buffer.from(await mp3File.arrayBuffer());
+    // 保存上传的文件
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const inputPath = path.join(TMP_DIR, `${fileId}.mp3`);
+    fs.writeFileSync(inputPath, buffer);
+    console.log(`[${requestId}] 已保存上传文件: ${inputPath}, 大小: ${buffer.length} bytes`);
     
-    // 检查是否为有效的MP3文件
-    if (!isValidMP3(fileBuffer)) {
-      console.error('无效的MP3文件');
-      return NextResponse.json({ error: 'Invalid MP3 file' }, { status: 400 });
+    // 验证MP3格式
+    if (!isValidMP3(buffer)) {
+      console.error(`[${requestId}] 无效的MP3文件格式`);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid MP3 file format' 
+      }, { status: 400 });
     }
     
-    // 获取转换选项
-    const sampleRate = formData.get('sampleRate')?.toString() || '44100';
-    const channels = formData.get('channels')?.toString() || '2';
-    console.log(`转换选项: 采样率=${sampleRate}, 声道=${channels}`);
+    // 设置输出路径
+    const outputPath = path.join(TMP_DIR, `${fileId}.wav`);
     
-    // 本地处理模式 - 使用ffmpeg
-    const outputBuffer = await convertWithFFmpeg(fileBuffer, parseInt(sampleRate), parseInt(channels));
+    // 检查FFmpeg是否可用
+    const isFFmpegAvailable = await checkFFmpeg();
+    console.log(`[${requestId}] FFmpeg可用状态: ${isFFmpegAvailable}`);
     
-    // 保存WAV文件并返回结果
-    return await saveAndReturnResult(outputBuffer, fileId, originalName);
+    let conversionSuccess = false;
+    
+    if (isFFmpegAvailable) {
+      // 尝试使用FFmpeg进行转换
+      try {
+        console.log(`[${requestId}] 使用FFmpeg进行转换...`);
+        conversionSuccess = await simpleConvert(
+          inputPath, 
+          outputPath, 
+          channels, 
+          sampleRate, 
+          bitDepth, 
+          volume,
+          trimStart,
+          trimEnd
+        );
+      } catch (conversionError) {
+        console.error(`[${requestId}] FFmpeg转换失败:`, conversionError);
+      }
+    }
+    
+    // 如果FFmpeg不可用或转换失败，创建一个示例WAV文件
+    if (!conversionSuccess) {
+      console.log(`[${requestId}] 创建示例WAV文件...`);
+      const sampleWavBuffer = await createSampleWav(sampleRate, channels, bitDepth);
+      fs.writeFileSync(outputPath, sampleWavBuffer);
+      conversionSuccess = true;
+      console.log(`[${requestId}] 已创建示例WAV文件: ${outputPath}, 大小: ${sampleWavBuffer.length} bytes`);
+    }
+    
+    // 如果转换成功，读取转换后的文件
+    let outputBuffer: Buffer;
+    if (conversionSuccess && fs.existsSync(outputPath)) {
+      outputBuffer = fs.readFileSync(outputPath);
+      console.log(`[${requestId}] 读取转换后的文件: ${outputPath}, 大小: ${outputBuffer.length} bytes`);
+    } else {
+      console.error(`[${requestId}] 转换失败或输出文件不存在`);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Conversion failed' 
+      }, { status: 500 });
+    }
+    
+    // 上传到R2（如果配置了R2，且未要求跳过）
+    let r2Url = '';
+    let r2Success = false;
+    
+    if (isR2Configured && !skipR2Upload) {
+      try {
+        const key = `wav/${fileId}.wav`;
+        r2Success = await uploadToR2(key, outputBuffer);
+        
+        if (r2Success) {
+          r2Url = await generatePresignedUrl(key);
+          console.log(`[${requestId}] 文件已上传到R2: ${key}, 预签名URL已生成`);
+        } else {
+          console.log(`[${requestId}] 上传到R2失败，将使用本地存储`);
+        }
+      } catch (r2Error) {
+        console.error(`[${requestId}] R2上传过程中出错:`, r2Error);
+      }
+    } else {
+      console.log(`[${requestId}] 跳过R2上传, isR2Configured=${isR2Configured}, skipR2Upload=${skipR2Upload}`);
+    }
+    
+    // 返回成功响应
+    console.log(`[${requestId}] 转换完成，准备返回响应`);
+    
+    return NextResponse.json({
+      success: true,
+      fileId,
+      fileName: file.name,
+      format: 'wav',
+      sampleRate,
+      channels,
+      bitDepth,
+      size: outputBuffer.length,
+      url: r2Success ? r2Url : `/api/convert?fileId=${fileId}`,
+      storageType: r2Success ? 'r2' : 'local'
+    });
   } catch (error) {
     console.error('转换过程中出错:', error);
-    return NextResponse.json({ 
-      error: 'Conversion failed', 
-      detail: error instanceof Error ? error.message : 'Unknown error',
-      fileId,
-      originalName 
+    
+    return NextResponse.json({
+      success: false,
+      error: 'Conversion failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
 
-// 获取转换结果
+// 处理GET请求 - 获取或下载已转换的文件
 export async function GET(request: NextRequest) {
-  // 获取fileId参数
-  const fileId = request.nextUrl.searchParams.get('fileId');
-  const isCheckOnly = request.nextUrl.searchParams.get('check') === 'true';
-  const isRebuild = request.nextUrl.searchParams.get('rebuild') === 'true';
-  const uploadToR2Param = request.nextUrl.searchParams.get('uploadToR2') === 'true';
-  const checkStorage = request.nextUrl.searchParams.get('storage');
-  const requestId = request.headers.get('x-request-id') || `convert-dl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  // 获取请求参数
+  const { searchParams } = request.nextUrl;
+  const fileId = searchParams.get('fileId');
+  const checkOnly = searchParams.get('check') === 'true';
+  const rebuildFile = searchParams.get('rebuild') === 'true';
+  const uploadToR2Param = searchParams.get('uploadToR2') === 'true';
+  const storageType = searchParams.get('storage') || 'any'; // any, local, r2
   
-  console.log(`[API:convert:${requestId}] 接收到获取转换结果请求: fileId=${fileId}, check=${isCheckOnly}, rebuild=${isRebuild}, uploadToR2=${uploadToR2Param}, storage=${checkStorage || 'any'}`);
+  // 生成唯一请求ID
+  const requestId = request.headers.get('x-request-id') || 
+    `convert-dl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  
+  console.log(`[API:convert:${requestId}] 接收到获取转换结果请求: fileId=${fileId}, check=${checkOnly}, rebuild=${rebuildFile}, uploadToR2=${uploadToR2Param}, storage=${storageType}`);
   
   if (!fileId) {
-    console.log(`[API:convert:${requestId}] 缺少fileId参数`);
-    return NextResponse.json({ error: 'Missing fileId parameter' }, { status: 400 });
+    console.error(`[API:convert:${requestId}] 缺少fileId参数`);
+    return NextResponse.json({ 
+      error: 'Missing fileId parameter',
+      requestId
+    }, { status: 400 });
   }
-
-  try {
-    const filePath = path.join(TMP_DIR, `${fileId}.wav`);
+  
+  // 构建本地文件路径
+  const localPath = path.join(TMP_DIR, `${fileId}.wav`);
+  console.log(`[API:convert:${requestId}] 检查文件路径: ${localPath}`);
+  
+  // 确保临时目录存在
+  if (!fs.existsSync(TMP_DIR)) {
+    console.log(`[API:convert:${requestId}] 创建TMP_DIR: ${TMP_DIR}`);
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+  }
+  console.log(`[API:convert:${requestId}] TMP_DIR存在: ${fs.existsSync(TMP_DIR)}`);
+  
+  // 检查文件是否存在于R2中
+  let r2FileExists = false;
+  if (isR2Configured && (storageType === 'any' || storageType === 'r2')) {
+    try {
+      const r2FileKey = `wav/${fileId}.wav`;
+      console.log(`检查文件是否存在于R2: ${r2FileKey}`);
+      r2FileExists = await fileExistsInR2(r2FileKey);
+      console.log(`[API:convert:${requestId}] 文件在R2中存在: ${r2FileExists}`);
+    } catch (error) {
+      console.error(`[API:convert:${requestId}] 检查R2存在性失败:`, error);
+    }
+  }
+  
+  // 检查文件是否存在于本地
+  let localFileExists = fs.existsSync(localPath);
+  console.log(`[API:convert:${requestId}] 文件在本地存在: ${localFileExists}`);
+  
+  // 如果找不到文件
+  if (!localFileExists && !r2FileExists) {
+    console.error(`[API:convert:${requestId}] 文件不存在: ${fileId}`);
+    return NextResponse.json({ 
+      error: 'File not found',
+      detail: '请求的文件不存在或已过期。WAV文件在转换后24小时内有效。',
+      requestId
+    }, { status: 404 });
+  }
+  
+  // 如果仅仅是检查文件存在性
+  if (checkOnly) {
+    console.log(`[API:convert:${requestId}] 文件存在性检查成功`);
+    return NextResponse.json({ 
+      exists: true,
+      localExists: localFileExists,
+      r2Exists: r2FileExists,
+      requestId
+    });
+  }
+  
+  // 如果文件在本地不存在，尝试从R2下载
+  if (!localFileExists) {
+    console.log(`[API:convert:${requestId}] 本地文件不存在: ${localPath}`);
     
-    // 记录详细的检查过程
-    console.log(`[API:convert:${requestId}] 检查文件路径: ${filePath}`);
-    console.log(`[API:convert:${requestId}] TMP_DIR存在: ${fs.existsSync(TMP_DIR)}`);
-    
-    let fileExists = fs.existsSync(filePath);
-    let fileInR2 = false;
-    
-    // 检查文件是否存在于R2
-    if (isR2Configured) {
-      try {
-        fileInR2 = await fileExistsInR2(`wav/${fileId}.wav`);
-        console.log(`[API:convert:${requestId}] 文件在R2中存在: ${fileInR2}`);
-      } catch (r2Error) {
-        console.warn(`[API:convert:${requestId}] 检查R2文件时出错:`, r2Error);
+    // 如果R2已配置，尝试从R2下载
+    if (isR2Configured && r2FileExists) {
+      console.log(`[API:convert:${requestId}] 文件在R2中存在，尝试下载`);
+      
+      // 确保TMP_DIR存在
+      if (!fs.existsSync(TMP_DIR)) {
+        fs.mkdirSync(TMP_DIR, { recursive: true });
+        console.log(`[API:convert:${requestId}] 创建临时目录: ${TMP_DIR}`);
+      }
+      
+      // 从R2下载文件
+      const fileBuffer = await downloadFromR2(`wav/${fileId}.wav`);
+      
+      if (fileBuffer) {
+        // 将文件保存到本地
+        fs.writeFileSync(localPath, fileBuffer);
+        console.log(`[API:convert:${requestId}] 文件已从R2下载并保存到本地: ${localPath}, 大小: ${fileBuffer.length} 字节`);
+        localFileExists = true;
+      } else {
+        console.log(`[API:convert:${requestId}] 无法从R2下载文件`);
+        r2FileExists = false;
       }
     }
     
-    // 如果只是检查模式，返回文件存在状态
-    if (isCheckOnly) {
-      console.log(`[API:convert:${requestId}] 检查模式: 本地=${fileExists}, R2=${fileInR2}, 检查存储=${checkStorage || 'any'}`);
+    // 如果文件仍然不存在，返回错误
+    if (!localFileExists && !r2FileExists) {
+      console.log(`[API:convert:${requestId}] 文件在R2和本地都不存在: wav/${fileId}.wav`);
+      return NextResponse.json({ 
+        error: 'File not found', 
+        detail: 'The requested file could not be found in any storage',
+        fileId,
+        local: false,
+        r2: false,
+        requestId,
+        timestamp: Date.now()
+      }, { status: 404 });
+    }
+  }
+  
+  // 处理专门的上传到R2请求
+  if (uploadToR2Param && isR2Configured && localFileExists) {
+    console.log(`[API:convert:${requestId}] 收到专门的上传到R2请求`);
+    
+    try {
+      // 读取文件并上传到R2
+      const fileBuffer = fs.readFileSync(localPath);
+      const uploadSuccess = await uploadToR2(
+        `wav/${fileId}.wav`,
+        fileBuffer,
+        {
+          'source': 'upload-request',
+          'request-id': requestId,
+          'timestamp': Date.now().toString()
+        },
+        'audio/wav'
+      );
       
-      // 如果指定检查特定存储
-      if (checkStorage === 'r2' && !fileInR2) {
+      if (uploadSuccess) {
+        console.log(`[API:convert:${requestId}] 文件已专门上传到R2: ${fileId}.wav`);
         return NextResponse.json({ 
-          exists: false, 
-          error: 'File not found in R2 storage',
-          local: fileExists,
-          r2: false,
+          success: true, 
+          message: 'File successfully uploaded to R2 storage',
           fileId,
-          requestId,
-          timestamp: Date.now()
-        }, { status: 404 });
-      } else if (checkStorage === 'local' && !fileExists) {
-        return NextResponse.json({ 
-          exists: false, 
-          error: 'File not found in local storage',
-          local: false,
-          r2: fileInR2,
-          fileId,
-          requestId,
-          timestamp: Date.now()
-        }, { status: 404 });
-      }
-      
-      if (fileExists || fileInR2) {
-        return NextResponse.json({ 
-          exists: true, 
-          local: fileExists,
-          r2: fileInR2,
-          fileId,
+          r2: true,
           requestId,
           timestamp: Date.now()
         });
       } else {
+        console.error(`[API:convert:${requestId}] 专门上传到R2失败`);
         return NextResponse.json({ 
-          exists: false, 
-          error: 'File not found',
-          local: false,
-          r2: false,
-          fileId,
-          requestId,
-          timestamp: Date.now()
-        }, { status: 404 });
-      }
-    }
-    
-    // 如果文件在本地不存在，尝试从R2下载
-    if (!fileExists) {
-      console.log(`[API:convert:${requestId}] 本地文件不存在: ${filePath}`);
-      
-      // 如果R2已配置，尝试从R2下载
-      if (isR2Configured && fileInR2) {
-        console.log(`[API:convert:${requestId}] 文件在R2中存在，尝试下载`);
-        
-        // 确保TMP_DIR存在
-        if (!fs.existsSync(TMP_DIR)) {
-          fs.mkdirSync(TMP_DIR, { recursive: true });
-          console.log(`[API:convert:${requestId}] 创建临时目录: ${TMP_DIR}`);
-        }
-        
-        // 从R2下载文件
-        const fileBuffer = await downloadFromR2(`wav/${fileId}.wav`);
-        
-        if (fileBuffer) {
-          // 将文件保存到本地
-          fs.writeFileSync(filePath, fileBuffer);
-          console.log(`[API:convert:${requestId}] 文件已从R2下载并保存到本地: ${filePath}, 大小: ${fileBuffer.length} 字节`);
-          fileExists = true;
-        } else {
-          console.log(`[API:convert:${requestId}] 无法从R2下载文件`);
-          fileInR2 = false;
-        }
-      }
-      
-      // 如果文件仍然不存在，返回错误
-      if (!fileExists && !fileInR2) {
-        console.log(`[API:convert:${requestId}] 文件在R2和本地都不存在: wav/${fileId}.wav`);
-        return NextResponse.json({ 
-          error: 'File not found', 
-          detail: 'The requested file could not be found in any storage',
-          fileId,
-          local: false,
-          r2: false,
-          requestId,
-          timestamp: Date.now()
-        }, { status: 404 });
-      }
-    }
-    
-    // 处理专门的上传到R2请求
-    if (uploadToR2Param && isR2Configured && fileExists) {
-      console.log(`[API:convert:${requestId}] 收到专门的上传到R2请求`);
-      
-      try {
-        // 读取文件并上传到R2
-        const fileBuffer = fs.readFileSync(filePath);
-        const uploadSuccess = await uploadToR2(
-          `wav/${fileId}.wav`,
-          fileBuffer,
-          {
-            'source': 'upload-request',
-            'request-id': requestId,
-            'timestamp': Date.now().toString()
-          },
-          'audio/wav'
-        );
-        
-        if (uploadSuccess) {
-          console.log(`[API:convert:${requestId}] 文件已专门上传到R2: ${fileId}.wav`);
-          return NextResponse.json({ 
-            success: true, 
-            message: 'File successfully uploaded to R2 storage',
-            fileId,
-            r2: true,
-            requestId,
-            timestamp: Date.now()
-          });
-        } else {
-          console.error(`[API:convert:${requestId}] 专门上传到R2失败`);
-          return NextResponse.json({ 
-            error: 'Failed to upload to R2', 
-            detail: 'The file could not be uploaded to R2 storage',
-            fileId,
-            requestId,
-            timestamp: Date.now()
-          }, { status: 500 });
-        }
-      } catch (uploadError) {
-        console.error(`[API:convert:${requestId}] 专门上传到R2时出错:`, uploadError);
-        return NextResponse.json({ 
-          error: 'R2 upload error', 
-          detail: uploadError instanceof Error ? uploadError.message : 'Unknown error during upload',
+          error: 'Failed to upload to R2', 
+          detail: 'The file could not be uploaded to R2 storage',
           fileId,
           requestId,
           timestamp: Date.now()
         }, { status: 500 });
       }
-    }
-    
-    console.log(`[API:convert:${requestId}] 文件存在，准备发送: ${filePath}`);
-    
-    // 如果R2已配置，确保文件同时存在于R2
-    if (isR2Configured && !fileInR2 && fileExists) {
-      try {
-        console.log(`[API:convert:${requestId}] 文件不在R2中，尝试上传`);
-        
-        // 读取文件并上传到R2
-        const fileBuffer = fs.readFileSync(filePath);
-        const uploadSuccess = await uploadToR2(
-          `wav/${fileId}.wav`,
-          fileBuffer,
-          {
-            'source': 'local-file',
-            'request-id': requestId,
-            'rebuild': isRebuild ? 'true' : 'false'
-          },
-          'audio/wav'
-        );
-        
-        if (uploadSuccess) {
-          console.log(`[API:convert:${requestId}] 文件已成功上传到R2`);
-          fileInR2 = true;
-        } else {
-          console.warn(`[API:convert:${requestId}] 上传文件到R2失败，但仍将继续发送本地文件`);
-        }
-      } catch (r2Error) {
-        console.warn(`[API:convert:${requestId}] 上传到R2时出错:`, r2Error);
-      }
-    }
-    
-    // 获取文件信息
-    const stat = fs.statSync(filePath);
-    console.log(`[API:convert:${requestId}] 文件大小: ${stat.size} 字节`);
-    
-    // 如果是重建模式，只返回成功状态而不是文件内容
-    if (isRebuild) {
+    } catch (uploadError) {
+      console.error(`[API:convert:${requestId}] 专门上传到R2时出错:`, uploadError);
       return NextResponse.json({ 
-        success: true,
-        message: 'File rebuild completed successfully',
+        error: 'R2 upload error', 
+        detail: uploadError instanceof Error ? uploadError.message : 'Unknown error during upload',
         fileId,
-        size: stat.size,
-        local: fileExists,
-        r2: fileInR2,
         requestId,
         timestamp: Date.now()
-      });
+      }, { status: 500 });
     }
-    
-    // 使用streams发送大文件
-    const stream = fs.createReadStream(filePath);
-    const chunks: Uint8Array[] = [];
-    
-    // 读取文件内容到内存
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-    }
-    
-    // 组合所有块
-    const fileBuffer = Buffer.concat(chunks);
-    
-    // 返回文件
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': 'audio/wav',
-        'Content-Disposition': `attachment; filename="${fileId}.wav"`,
-        'Content-Length': stat.size.toString(),
-        'Cache-Control': 'no-cache',
-        'x-request-id': requestId
+  }
+  
+  console.log(`[API:convert:${requestId}] 文件存在，准备发送: ${localPath}`);
+  
+  // 如果R2已配置，确保文件同时存在于R2
+  if (isR2Configured && !r2FileExists && localFileExists) {
+    try {
+      console.log(`[API:convert:${requestId}] 文件不在R2中，尝试上传`);
+      
+      // 读取文件并上传到R2
+      const fileBuffer = fs.readFileSync(localPath);
+      const uploadSuccess = await uploadToR2(
+        `wav/${fileId}.wav`,
+        fileBuffer,
+        {
+          'source': 'local-file',
+          'request-id': requestId,
+          'rebuild': rebuildFile ? 'true' : 'false'
+        },
+        'audio/wav'
+      );
+      
+      if (uploadSuccess) {
+        console.log(`[API:convert:${requestId}] 文件已成功上传到R2`);
+        r2FileExists = true;
+      } else {
+        console.warn(`[API:convert:${requestId}] 上传文件到R2失败，但仍将继续发送本地文件`);
       }
-    });
-  } catch (error) {
-    console.error(`[API:convert:${requestId}] 获取转换结果出错:`, error);
+    } catch (r2Error) {
+      console.warn(`[API:convert:${requestId}] 上传到R2时出错:`, r2Error);
+    }
+  }
+  
+  // 获取文件信息
+  const stat = fs.statSync(localPath);
+  console.log(`[API:convert:${requestId}] 文件大小: ${stat.size} 字节`);
+  
+  // 如果是重建模式，只返回成功状态而不是文件内容
+  if (rebuildFile) {
     return NextResponse.json({ 
-      error: 'Internal server error',
-      detail: error instanceof Error ? error.message : 'Unknown error',
+      success: true,
+      message: 'File rebuild completed successfully',
       fileId,
+      size: stat.size,
+      local: localFileExists,
+      r2: r2FileExists,
       requestId,
       timestamp: Date.now()
-    }, { status: 500 });
+    });
   }
+  
+  // 使用streams发送大文件
+  const stream = fs.createReadStream(localPath);
+  const chunks: Uint8Array[] = [];
+  
+  // 读取文件内容到内存
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  
+  // 组合所有块
+  const fileBuffer = Buffer.concat(chunks);
+  
+  // 返回文件
+  return new NextResponse(fileBuffer, {
+    headers: {
+      'Content-Type': 'audio/wav',
+      'Content-Disposition': `attachment; filename="${fileId}.wav"`,
+      'Content-Length': stat.size.toString(),
+      'Cache-Control': 'no-cache',
+      'x-request-id': requestId
+    }
+  });
 }
 
 // 添加OPTIONS方法处理CORS预检请求

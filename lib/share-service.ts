@@ -189,4 +189,86 @@ export async function getShareData(id: string) {
       message: error instanceof Error ? error.message : 'Unknown error'
     };
   }
+}
+
+/**
+ * 获取分享目录路径
+ */
+export function getSharesDir(): string {
+  const sharesDir = process.env.SHARES_DIR || path.join(process.env.TMP_DIR || path.join(process.cwd(), 'tmp'), 'shares');
+  
+  // 确保目录存在
+  if (!fs.existsSync(sharesDir)) {
+    fs.mkdirSync(sharesDir, { recursive: true });
+  }
+  
+  return sharesDir;
+}
+
+/**
+ * 获取所有分享文件路径
+ */
+export async function getShareFiles(): Promise<string[]> {
+  const sharesDir = getSharesDir();
+  
+  // 检查目录是否存在
+  if (!fs.existsSync(sharesDir)) {
+    return [];
+  }
+  
+  // 读取目录内容
+  const files = fs.readdirSync(sharesDir)
+    .filter(file => file.endsWith('.json'))
+    .map(file => path.join(sharesDir, file));
+  
+  return files;
+}
+
+/**
+ * 删除分享信息
+ * @param shareId 分享ID
+ * @returns 是否成功删除
+ */
+export function removeShareInfo(shareId: string): boolean {
+  try {
+    const sharesDir = getSharesDir();
+    const sharePath = path.join(sharesDir, `${shareId}.json`);
+    
+    if (!fs.existsSync(sharePath)) {
+      console.log(`移除分享信息: 文件不存在 ${sharePath}`);
+      return false;
+    }
+
+    // 读取分享信息，获取关联的fileId
+    let fileId: string | null = null;
+    try {
+      const shareData = fs.readFileSync(sharePath, 'utf-8');
+      const shareInfo = JSON.parse(shareData);
+      fileId = shareInfo.fileId;
+    } catch (error) {
+      console.error(`读取分享信息失败:`, error);
+    }
+    
+    // 删除分享信息文件
+    fs.unlinkSync(sharePath);
+    console.log(`已删除分享信息: ${sharePath}`);
+    
+    // 如果有fileId，尝试删除关联的文件
+    if (fileId) {
+      const filePath = path.join(process.cwd(), 'tmp', `${fileId}.wav`);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`已删除关联文件: ${filePath}`);
+        } catch (fileError) {
+          console.error(`删除关联文件失败:`, fileError);
+        }
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`删除分享信息时出错:`, error);
+    return false;
+  }
 } 
