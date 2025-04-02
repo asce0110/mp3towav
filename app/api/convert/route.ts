@@ -589,9 +589,11 @@ export async function GET(request: NextRequest) {
   const fileId = request.nextUrl.searchParams.get('fileId');
   const isCheckOnly = request.nextUrl.searchParams.get('check') === 'true';
   const isRebuild = request.nextUrl.searchParams.get('rebuild') === 'true';
+  const uploadToR2Param = request.nextUrl.searchParams.get('uploadToR2') === 'true';
+  const checkStorage = request.nextUrl.searchParams.get('storage');
   const requestId = request.headers.get('x-request-id') || `convert-dl-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   
-  console.log(`[API:convert:${requestId}] 接收到获取转换结果请求: fileId=${fileId}, check=${isCheckOnly}, rebuild=${isRebuild}`);
+  console.log(`[API:convert:${requestId}] 接收到获取转换结果请求: fileId=${fileId}, check=${isCheckOnly}, rebuild=${isRebuild}, uploadToR2=${uploadToR2Param}, storage=${checkStorage || 'any'}`);
   
   if (!fileId) {
     console.log(`[API:convert:${requestId}] 缺少fileId参数`);
@@ -620,7 +622,30 @@ export async function GET(request: NextRequest) {
     
     // 如果只是检查模式，返回文件存在状态
     if (isCheckOnly) {
-      console.log(`[API:convert:${requestId}] 检查模式: 本地=${fileExists}, R2=${fileInR2}`);
+      console.log(`[API:convert:${requestId}] 检查模式: 本地=${fileExists}, R2=${fileInR2}, 检查存储=${checkStorage || 'any'}`);
+      
+      // 如果指定检查特定存储
+      if (checkStorage === 'r2' && !fileInR2) {
+        return NextResponse.json({ 
+          exists: false, 
+          error: 'File not found in R2 storage',
+          local: fileExists,
+          r2: false,
+          fileId,
+          requestId,
+          timestamp: Date.now()
+        }, { status: 404 });
+      } else if (checkStorage === 'local' && !fileExists) {
+        return NextResponse.json({ 
+          exists: false, 
+          error: 'File not found in local storage',
+          local: false,
+          r2: fileInR2,
+          fileId,
+          requestId,
+          timestamp: Date.now()
+        }, { status: 404 });
+      }
       
       if (fileExists || fileInR2) {
         return NextResponse.json({ 
@@ -644,6 +669,7 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // 如果文件在本地不存在，尝试从R2下载
     if (!fileExists) {
       console.log(`[API:convert:${requestId}] 本地文件不存在: ${filePath}`);
       
@@ -683,6 +709,56 @@ export async function GET(request: NextRequest) {
           requestId,
           timestamp: Date.now()
         }, { status: 404 });
+      }
+    }
+    
+    // 处理专门的上传到R2请求
+    if (uploadToR2Param && isR2Configured && fileExists) {
+      console.log(`[API:convert:${requestId}] 收到专门的上传到R2请求`);
+      
+      try {
+        // 读取文件并上传到R2
+        const fileBuffer = fs.readFileSync(filePath);
+        const uploadSuccess = await uploadToR2(
+          `wav/${fileId}.wav`,
+          fileBuffer,
+          {
+            'source': 'upload-request',
+            'request-id': requestId,
+            'timestamp': Date.now().toString()
+          },
+          'audio/wav'
+        );
+        
+        if (uploadSuccess) {
+          console.log(`[API:convert:${requestId}] 文件已专门上传到R2: ${fileId}.wav`);
+          return NextResponse.json({ 
+            success: true, 
+            message: 'File successfully uploaded to R2 storage',
+            fileId,
+            r2: true,
+            requestId,
+            timestamp: Date.now()
+          });
+        } else {
+          console.error(`[API:convert:${requestId}] 专门上传到R2失败`);
+          return NextResponse.json({ 
+            error: 'Failed to upload to R2', 
+            detail: 'The file could not be uploaded to R2 storage',
+            fileId,
+            requestId,
+            timestamp: Date.now()
+          }, { status: 500 });
+        }
+      } catch (uploadError) {
+        console.error(`[API:convert:${requestId}] 专门上传到R2时出错:`, uploadError);
+        return NextResponse.json({ 
+          error: 'R2 upload error', 
+          detail: uploadError instanceof Error ? uploadError.message : 'Unknown error during upload',
+          fileId,
+          requestId,
+          timestamp: Date.now()
+        }, { status: 500 });
       }
     }
     

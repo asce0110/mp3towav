@@ -34,10 +34,10 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
       // 标记开始时间用于性能监控
       const startTime = Date.now();
       
-      // 首先验证文件是否存在
+      // 首先验证文件是否存在并确保已上传到R2存储
       try {
-        console.log(`[分享] 验证文件是否存在: fileId=${fileId}`);
-        const checkResponse = await fetch(`/api/convert?fileId=${fileId}&check=true`, {
+        console.log(`[分享] 验证文件是否存在并且已上传到R2: fileId=${fileId}`);
+        const checkResponse = await fetch(`/api/convert?fileId=${fileId}&check=true&storage=r2`, {
           headers: {
             'x-request-id': `${requestId}-check`,
             'x-debug': 'true'
@@ -45,43 +45,37 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
         });
         
         if (!checkResponse.ok) {
-          // 如果文件不存在，则尝试重新获取转换结果
-          if (checkResponse.status === 404) {
-            console.log(`[分享] 文件不存在，尝试重新下载: fileId=${fileId}`);
-            
-            // 推送消息通知用户
-            toast({
-              title: "正在准备文件",
-              description: "文件正在准备中，请稍候...",
+          // 如果文件不存在或未上传到R2，尝试上传
+          console.log(`[分享] 文件状态检查失败，状态码: ${checkResponse.status}, 尝试上传文件`);
+          
+          // 显示上传中通知
+          toast({
+            title: "正在准备文件",
+            description: "文件正在上传到服务器中，请稍候...",
+          });
+          
+          try {
+            // 触发文件上传到R2
+            const uploadResponse = await fetch(`/api/convert?fileId=${fileId}&uploadToR2=true`, {
+              headers: {
+                'x-request-id': `${requestId}-upload`,
+                'x-debug': 'true'
+              }
             });
             
-            try {
-              // 尝试下载文件以触发服务器端文件重建
-              const rebuildResponse = await fetch(`/api/convert?fileId=${fileId}&rebuild=true`, {
-                headers: {
-                  'x-request-id': `${requestId}-rebuild`,
-                  'x-debug': 'true'
-                }
-              });
-              
-              if (!rebuildResponse.ok) {
-                const errorData = await rebuildResponse.json();
-                console.error(`[分享] 重建文件失败:`, errorData);
-                throw new Error(errorData.error || `文件重建失败: ${rebuildResponse.status}`);
-              }
-              
-              console.log(`[分享] 文件重建成功: fileId=${fileId}`);
-            } catch (rebuildError) {
-              console.error(`[分享] 重建文件时出错:`, rebuildError);
-              throw new Error('无法恢复文件。请尝试重新转换。');
+            if (!uploadResponse.ok) {
+              const errorData = await uploadResponse.json();
+              console.error(`[分享] 上传文件失败:`, errorData);
+              throw new Error(errorData.error || `文件上传失败: ${uploadResponse.status}`);
             }
-          } else {
-            const errorData = await checkResponse.json();
-            console.error(`[分享] 验证文件时出错:`, errorData);
-            throw new Error(errorData.error || `验证文件失败: ${checkResponse.status}`);
+            
+            console.log(`[分享] 文件成功上传到R2: fileId=${fileId}`);
+          } catch (uploadError) {
+            console.error(`[分享] 上传文件时出错:`, uploadError);
+            throw new Error('无法上传文件。请尝试重新转换。');
           }
         } else {
-          console.log(`[分享] 文件验证成功: fileId=${fileId}`);
+          console.log(`[分享] 文件验证成功，可以继续创建分享: fileId=${fileId}`);
         }
       } catch (checkError) {
         console.error(`[分享] 验证文件时出错:`, checkError);
@@ -100,7 +94,8 @@ export function ShareButton({ fileId, originalName }: ShareButtonProps) {
         body: JSON.stringify({
           fileId,
           originalName: originalName || `${fileId}.wav`,
-          clientTime: new Date().toISOString()
+          clientTime: new Date().toISOString(),
+          ensureUploaded: true  // 新增参数，确保文件已上传到R2
         })
       });
       

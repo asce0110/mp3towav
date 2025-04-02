@@ -171,14 +171,14 @@ export async function POST(request: NextRequest) {
   try {
     console.log(`[API:share:${requestId}] 开始处理创建分享请求`);
     const data = await request.json();
-    const { fileId, originalName } = data;
+    const { fileId, originalName, ensureUploaded = false } = data;
     
     if (!fileId) {
       console.log(`[API:share:${requestId}] 缺少fileId参数`);
       return NextResponse.json({ error: 'Missing fileId parameter' }, { status: 400 });
     }
     
-    console.log(`[API:share:${requestId}] 处理分享请求: fileId=${fileId}, originalName=${originalName || 'unknown'}`);
+    console.log(`[API:share:${requestId}] 处理分享请求: fileId=${fileId}, originalName=${originalName || 'unknown'}, ensureUploaded=${ensureUploaded}`);
     
     // 检查文件是否存在于R2或本地文件系统
     let fileSource = 'unknown';
@@ -235,14 +235,19 @@ export async function POST(request: NextRequest) {
     
     // 如果文件在本地但不在R2，并且R2已配置，上传到R2
     let uploadAttempted = false;
-    if (hasLocalFile && !hasR2File && isR2Configured) {
+    let uploadSuccess = false;
+    
+    // 判断是否需要强制上传到R2（ensureUploaded为true）
+    const shouldUploadToR2 = isR2Configured && (ensureUploaded || (!hasR2File && hasLocalFile));
+    
+    if (shouldUploadToR2) {
       try {
-        console.log(`[API:share:${requestId}] 尝试将本地文件上传到R2: ${r2Key}`);
+        console.log(`[API:share:${requestId}] 尝试将本地文件上传到R2: ${r2Key}, 强制上传=${ensureUploaded}`);
         const fileBuffer = fs.readFileSync(localFilePath);
         uploadAttempted = true;
         
         console.log(`[API:share:${requestId}] 文件读取成功，大小: ${fileBuffer.length} 字节，开始上传...`);
-        const uploadSuccess = await uploadToR2(
+        uploadSuccess = await uploadToR2(
           r2Key,
           fileBuffer,
           {
@@ -266,7 +271,7 @@ export async function POST(request: NextRequest) {
             console.error(`[API:share:${requestId}] 警告：上传成功但文件在R2中不存在: ${r2Key}`);
             // 重试上传
             console.log(`[API:share:${requestId}] 重试上传...`);
-            const retrySuccess = await uploadToR2(
+            uploadSuccess = await uploadToR2(
               r2Key,
               fileBuffer,
               {
@@ -278,7 +283,7 @@ export async function POST(request: NextRequest) {
               'audio/wav'
             );
             
-            if (retrySuccess) {
+            if (uploadSuccess) {
               const retryVerify = await fileExistsInR2(r2Key);
               if (retryVerify) {
                 console.log(`[API:share:${requestId}] 重试上传成功，文件现在存在于R2: ${r2Key}`);
@@ -297,6 +302,17 @@ export async function POST(request: NextRequest) {
       } catch (uploadError) {
         console.error(`[API:share:${requestId}] 上传到R2时出错:`, uploadError);
       }
+    }
+    
+    // 如果强制要求上传到R2但上传失败，返回错误
+    if (ensureUploaded && !hasR2File) {
+      console.error(`[API:share:${requestId}] 需要强制上传到R2但未成功: fileId=${fileId}`);
+      return NextResponse.json({ 
+        error: 'Failed to upload to R2', 
+        detail: 'The file could not be uploaded to storage for sharing',
+        requestId,
+        timestamp: Date.now()
+      }, { status: 500 });
     }
     
     // 如果上传失败或未上传到R2，提醒用户
