@@ -41,11 +41,5 @@
   ],
   "env": {
     "NEXT_PUBLIC_API_BODYPARSER_SIZE_LIMIT": "100mb"
-  },
-  "crons": [
-    {
-      "path": "/api/cleanup",
-      "schedule": "0 * * * *"
-    }
-  ]
+  }
 } 

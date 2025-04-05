@@ -1,35 +1,23 @@
 /**
- * Cloudflare Worker脚本，用于定时清理R2存储桶中的过期文件
+ * Cloudflare Worker脚本，用于清理R2存储桶中的过期文件
  * 
  * 部署指南:
  * 1. 安装Cloudflare Wrangler: npm install -g wrangler
  * 2. 登录Cloudflare: wrangler login
  * 3. 创建worker: wrangler init r2-cleaner
  * 4. 将此代码复制到worker目录
- * 5. 配置wrangler.toml文件:
- *    [triggers]
- *    crons = ["0 */6 * * *"]  # 每6小时运行一次
+ * 5. 配置wrangler.toml文件
  * 6. 设置环境变量: wrangler secret put R2_BUCKET_NAME
  * 7. 部署: wrangler publish
+ * 
+ * 注意：此版本移除了自动定时任务，仅通过HTTP请求手动触发清理
  */
 
 export default {
-  async scheduled(event, env, ctx) {
-    try {
-      const result = await cleanupExpiredFiles(env);
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (error) {
-      console.error('清理任务失败:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-  },
+  // 移除scheduled处理函数，改为只支持HTTP触发
+  // async scheduled(event, env, ctx) { ... }
   
-  // 可选：允许通过HTTP触发清理
+  // 通过HTTP触发清理
   async fetch(request, env, ctx) {
     // 检查请求是否来自允许的IP或包含正确的访问令牌
     // 实际部署时应添加适当的安全验证
