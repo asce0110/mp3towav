@@ -75,7 +75,8 @@
       "preparingDownload": "다운로드 준비 중...",
       "readyToDownload": "다운로드 준비 완료",
       "conversionSuccess": "MP3가 WAV로 성공적으로 변환되었습니다!",
-      "conversionFailed": "변환에 실패했습니다. 다시 시도해 주세요."
+      "conversionFailed": "변환에 실패했습니다. 다시 시도해 주세요.",
+      "loading": "파일 로딩 중..."
     },
     "waveform": {
       "dragHint": "녹색 및 빨간색 마커를 드래그하여 트리밍 조정",

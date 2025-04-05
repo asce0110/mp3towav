@@ -75,7 +75,8 @@
       "preparingDownload": "Download wird vorbereitet...",
       "readyToDownload": "Bereit zum Herunterladen",
       "conversionSuccess": "MP3 erfolgreich zu WAV konvertiert!",
-      "conversionFailed": "Konvertierung fehlgeschlagen. Bitte versuchen Sie es erneut."
+      "conversionFailed": "Konvertierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+      "loading": "Dateien werden geladen..."
     },
     "waveform": {
       "dragHint": "Ziehen Sie grüne und rote Markierungen, um den Zuschnitt anzupassen",

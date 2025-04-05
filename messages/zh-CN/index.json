@@ -76,7 +76,8 @@
       "readyToDownload": "准备好下载",
       "conversionSuccess": "MP3成功转换为WAV！",
       "conversionFailed": "转换失败。请重试。",
-      "filesWithMissingData": "个文件缺少数据"
+      "filesWithMissingData": "个文件缺少数据",
+      "loading": "加载文件中..."
     },
     "waveform": {
       "dragHint": "拖动绿色和红色标记调整裁剪",

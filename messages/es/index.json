@@ -75,7 +75,8 @@
       "preparingDownload": "Preparando descarga...",
       "readyToDownload": "Listo para descargar",
       "conversionSuccess": "¡MP3 convertido exitosamente a WAV!",
-      "conversionFailed": "Error en la conversión. Por favor, inténtalo de nuevo."
+      "conversionFailed": "Error en la conversión. Por favor, inténtalo de nuevo.",
+      "loading": "Cargando archivos..."
     },
     "waveform": {
       "dragHint": "Arrastra los marcadores verde y rojo para ajustar el recorte",

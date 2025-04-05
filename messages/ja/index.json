@@ -75,7 +75,8 @@
       "preparingDownload": "ダウンロードを準備中...",
       "readyToDownload": "ダウンロードの準備完了",
       "conversionSuccess": "MP3がWAVに正常に変換されました！",
-      "conversionFailed": "変換に失敗しました。もう一度お試しください。"
+      "conversionFailed": "変換に失敗しました。もう一度お試しください。",
+      "loading": "ファイルを読み込み中..."
     },
     "waveform": {
       "dragHint": "緑と赤のマーカーをドラッグしてトリミングを調整",
