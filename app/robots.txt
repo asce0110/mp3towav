@@ -6,5 +6,15 @@ Allow: /
 Disallow: /api/
 Disallow: /_next/
 
+# 禁止爬虫访问动态页面
+Disallow: /upload/
+Disallow: /*/upload/
+Disallow: /download/
+Disallow: /*/download/
+Disallow: /share/*/
+Disallow: /*/share/*/
+Disallow: /batch-upload/*/
+Disallow: /*/batch-upload/*/
+
 # 站点地图链接
 Sitemap: https://mp3towav.vercel.app/sitemap.xml 

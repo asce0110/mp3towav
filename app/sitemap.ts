@@ -4,11 +4,12 @@ import { locales, defaultLocale } from '@/lib/i18n.config'
 // 站点URL
 const baseUrl = 'https://mp3towav.vercel.app'
 
-// 主要页面路径
+// 主要页面路径（只包含静态页面）
 const routes = [
   '',                // 首页
-  '/share',          // 分享页面
+  '/share',          // 分享入口页面
   '/batch-process',  // 批处理页面
+  '/history',        // 历史记录页面
 ]
 
 // 生成网站地图
@@ -37,7 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     })
     
-    // 为每种语言添加其他页面
+    // 为每种语言添加其他静态页面
     for (const route of routes) {
       // 跳过主页（已处理）
       if (route === '') continue
@@ -51,7 +52,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
   
-  // 添加英文版的其他页面（不带语言前缀）
+  // 添加英文版的其他静态页面（不带语言前缀）
   for (const route of routes) {
     // 跳过主页（已处理）
     if (route === '') continue
