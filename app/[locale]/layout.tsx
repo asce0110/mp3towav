@@ -32,6 +32,10 @@ export async function generateMetadata(props: {
       title: 'MP3 to WAV Converter',
       description: 'Convert MP3 files to WAV format easily online',
       keywords: 'mp3, wav, conversion, audio, online converter',
+      metadataBase: new URL('https://mp3towav.vercel.app'),
+      alternates: {
+        canonical: '/'
+      }
     };
   }
 
@@ -43,6 +47,10 @@ export async function generateMetadata(props: {
       title: messages.app?.title || 'MP3 to WAV Converter',
       description: messages.app?.description || 'Convert MP3 files to WAV format easily online',
       keywords: messages.metadata?.keywords || 'mp3, wav, conversion, audio, online converter',
+      metadataBase: new URL('https://mp3towav.vercel.app'),
+      alternates: {
+        canonical: locale === defaultLocale ? '/' : `/${locale}`
+      }
     };
   } catch (error) {
     console.error('Error generating metadata:', error);
@@ -52,6 +60,10 @@ export async function generateMetadata(props: {
       title: 'MP3 to WAV Converter',
       description: 'Convert MP3 files to WAV format easily online',
       keywords: 'mp3, wav, conversion, audio, online converter',
+      metadataBase: new URL('https://mp3towav.vercel.app'),
+      alternates: {
+        canonical: '/'
+      }
     };
   }
 }
