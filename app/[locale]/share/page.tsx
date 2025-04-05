@@ -1,19 +1,6 @@
-"use client"
-
-import { Suspense } from 'react'
 import { SharePageContent } from './components'
-import { Loader2 } from 'lucide-react'
 
-// 使用Suspense包装内容组件以处理useSearchParams问题
+// 使用服务器组件渲染页面
 export default function SharePage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="mr-2 h-8 w-8 animate-spin" />
-        <span className="text-xl">Loading...</span>
-      </div>
-    }>
-      <SharePageContent />
-    </Suspense>
-  )
+  return <SharePageContent />
 } 

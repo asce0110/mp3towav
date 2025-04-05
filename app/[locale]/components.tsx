@@ -2,32 +2,12 @@
 
 import { MP3toWAVConverter } from "@/components/mp3-to-wav-converter"
 import { SiteHeader } from "@/components/site-header"
-import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { locales, defaultLocale } from "@/lib/i18n.config"
 import { useTranslations } from 'next-intl'
-import { useParams } from 'next/navigation'
 
-// 定义locales的类型
-type LocaleType = typeof locales[number];
-
-export function HomePageContent() {
-  const params = useParams();
-  const [locale, setLocale] = useState<string>(params.locale as string || defaultLocale);
-  const pathname = usePathname();
+// 创建一个纯客户端组件，只负责渲染转换器部分
+export function MP3WAVConverterSection() {
   const t = useTranslations('converter');
   const appT = useTranslations('app');
-  
-  useEffect(() => {
-    const extractedLocale = pathname.split('/')[1];
-    const localesList = locales;
-    
-    if (extractedLocale && localesList.includes(extractedLocale as LocaleType)) {
-      setLocale(extractedLocale);
-    } else {
-      setLocale(defaultLocale);
-    }
-  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
