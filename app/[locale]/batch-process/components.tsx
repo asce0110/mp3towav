@@ -335,9 +335,9 @@ export function BatchProcessContent() {
                             
                             <Badge 
                               variant={
-                                file.status === 'completed' ? 'success' : 
+                                file.status === 'completed' ? 'secondary' : 
                                 file.status === 'error' ? 'destructive' : 
-                                file.status === 'converting' ? 'warning' : 
+                                file.status === 'converting' ? 'default' : 
                                 'outline'
                               }
                             >
