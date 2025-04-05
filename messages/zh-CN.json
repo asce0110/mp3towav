@@ -1,0 +1,170 @@
+{
+  "converter": {
+    "title": "MP3 转 WAV 转换器",
+    "subtitle": "快速、轻松地将您的 MP3 文件转换为高质量的 WAV 格式。",
+    "dropzone": {
+      "title": "拖放您的 MP3 文件到这里",
+      "subtitle": "或点击浏览文件",
+      "hint": "最大文件大小：100MB"
+    },
+    "buttons": {
+      "convert": "转换为 WAV",
+      "download": "您的文件已准备好下载",
+      "upload": "上传 MP3 文件"
+    },
+    "settings": {
+      "title": "设置",
+      "volume": "音量",
+      "sampleRate": "采样率",
+      "channels": "声道",
+      "bitDepth": "位深",
+      "trim": "裁剪",
+      "mono": "单声道",
+      "stereo": "立体声"
+    },
+    "status": {
+      "converting": "转换中",
+      "conversionSuccess": "转换成功",
+      "conversionFailed": "转换失败",
+      "audioLoadError": "无法加载音频文件。请确保它是有效的 MP3 文件并重试。",
+      "playbackError": "播放音频时出错，请重试。",
+      "invalidTrimRange": "裁剪范围太短，请至少选择 0.1 秒的音频。"
+    },
+    "waveform": {
+      "dragHint": "拖动绿色和红色标记调整裁剪",
+      "playing": "播放中",
+      "paused": "已暂停",
+      "play": "播放",
+      "pause": "暂停"
+    },
+    "download": {
+      "title": "下载您的 WAV 文件",
+      "readyToDownload": "您的文件已准备好下载",
+      "downloadNow": "立即下载",
+      "downloadAgain": "再次下载",
+      "share": "分享",
+      "whatNext": "接下来做什么？",
+      "convertMore": "您想要转换更多文件吗？",
+      "backToHome": "返回首页",
+      "loading": "正在准备您的下载"
+    }
+  },
+  "common": {
+    "upload": "选择文件",
+    "cancel": "停止",
+    "preview": "预览",
+    "error": "错误",
+    "loading": "加载中...",
+    "success": "成功",
+    "title": "MP3 转 WAV 转换器",
+    "description": "一个免费的在线工具，用于将 MP3 音频文件转换为 WAV 格式",
+    "waiting": "等待中...",
+    "processing": "处理中...",
+    "back": "返回",
+    "next": "下一步",
+    "continue": "继续",
+    "close": "关闭",
+    "submit": "提交",
+    "save": "保存",
+    "delete": "删除",
+    "download": "下载",
+    "share": "分享",
+    "reset": "重置",
+    "apply": "应用"
+  },
+  "features": {
+    "title": "特点",
+    "privacy": {
+      "title": "隐私保护",
+      "description": "您的文件在您的设备上处理，并在24小时后删除。"
+    },
+    "quality": {
+      "title": "高质量转换",
+      "description": "通过我们的无损 WAV 转换获得原始音频质量。"
+    },
+    "speed": {
+      "title": "快速处理",
+      "description": "通过优化的算法，即使是大文件也能快速转换。"
+    },
+    "settings": {
+      "title": "高级设置",
+      "description": "自定义采样率、位深度、声道等。"
+    }
+  },
+  "faq": {
+    "title": "常见问题",
+    "questions": {
+      "howToConvert": {
+        "question": "如何将 MP3 转换为 WAV？",
+        "answer": "只需上传您的 MP3 文件，根据需要调整任何设置，然后点击转换按钮。处理完成后，您可以下载 WAV 文件或分享它。"
+      },
+      "storageTime": {
+        "question": "我的文件存储多长时间？",
+        "answer": "您的文件安全存储 24 小时以允许下载，之后会自动从我们的服务器中删除。"
+      },
+      "trimAudio": {
+        "question": "如何裁剪我的音频？",
+        "answer": "上传 MP3 文件后，您将看到波形显示。拖动绿色标记设置裁剪范围的起点，拖动红色标记设置终点。"
+      }
+    }
+  },
+  "share": {
+    "title": "分享您的音频文件",
+    "loading": "正在加载分享信息...",
+    "expired": "已过期",
+    "hours": "小时",
+    "minutes": "分钟",
+    "success": {
+      "title": "文件分享成功！",
+      "description": "您的音频文件已上传并准备好分享。链接有效期为24小时。"
+    },
+    "file": {
+      "title": "已分享文件",
+      "download": "下载"
+    },
+    "link": {
+      "title": "分享链接",
+      "copy": "复制",
+      "copied": "已复制！"
+    },
+    "copied": {
+      "title": "链接已复制！",
+      "description": "分享链接已复制到剪贴板。",
+      "failed": "复制失败",
+      "error": "无法复制到剪贴板。"
+    },
+    "access": {
+      "title": "访问共享文件",
+      "pageTitle": "访问共享文件",
+      "description": "输入分享ID以访问共享音频文件。",
+      "placeholder": "输入分享ID...",
+      "button": "访问",
+      "hint": "您可以通过输入分享ID或使用完整链接来访问共享文件。",
+      "empty": "需要分享ID",
+      "emptyDescription": "请输入分享ID以继续。"
+    },
+    "notFound": {
+      "title": "分享未找到",
+      "description": "共享文件不存在或已过期。",
+      "button": "返回首页"
+    },
+    "failed": "分享失败",
+    "error": "无法分享文件。请重试。",
+    "uploadWarning": "云上传失败",
+    "usingLocal": "使用本地文件代替。此链接仅在您当前设备上有效。",
+    "localFileWarning": "本地文件分享",
+    "localFileDescription": "此文件存储在您的设备本地，无法从其他设备访问。",
+    "history": {
+      "title": "分享历史",
+      "empty": "您的历史记录中没有共享文件",
+      "view": "查看",
+      "download": "下载",
+      "delete": "删除",
+      "clear": "清除全部",
+      "deleted": "分享已删除",
+      "deletedDescription": "共享文件已从您的历史记录中删除。",
+      "cleared": "历史已清除",
+      "clearedDescription": "所有共享文件已从您的历史记录中删除。"
+    }
+  }
+} 

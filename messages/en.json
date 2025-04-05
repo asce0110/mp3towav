@@ -1,0 +1,10 @@
+"status": {
+  "converting": "Converting",
+  "analyzing": "Analyzing audio",
+  "processing": "Processing audio",
+  "preparing": "Preparing download",
+  "conversionFailed": "Conversion Failed",
+  "audioLoadError": "Failed to load audio. Please check your file and try again.",
+  "conversionError": "Error during conversion. Please try again.",
+  "filesWithMissingData": "files have missing data"
+} 

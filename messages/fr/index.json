@@ -1,0 +1,443 @@
+{
+  "app": {
+    "title": "Convertisseur MP3 vers WAV | Outil audio en ligne gratuit",
+    "description": "Convertisseur gratuit de MP3 vers WAV. Convertissez des fichiers audio en ligne avec des réglages personnalisés de taux d'échantillonnage, de profondeur de bits et de volume. Aucune installation nécessaire pour une qualité audio parfaite."
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "title": "Convertisseur MP3 vers WAV",
+    "description": "Un outil en ligne gratuit pour convertir des fichiers audio MP3 en format WAV",
+    "waiting": "En attente...",
+    "processing": "Traitement...",
+    "back": "Retour",
+    "next": "Suivant",
+    "continue": "Continuer",
+    "close": "Fermer",
+    "submit": "Soumettre",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "download": "Télécharger",
+    "share": "Partager",
+    "reset": "Réinitialiser",
+    "apply": "Appliquer",
+    "preview": "Aperçu",
+    "cancel": "Annuler",
+    "upload": "Téléverser",
+    "confirm": "Confirmer"
+  },
+  "converter": {
+    "title": "Convertisseur MP3 vers WAV",
+    "subtitle": "Convertisseur audio en ligne gratuit",
+    "description": "Convertissez vos fichiers audio MP3 au format WAV avec cet outil en ligne gratuit",
+    "uploadTitle": "Télécharger un fichier MP3",
+    "uploadSubtitle": "Glissez-déposez des fichiers ici ou cliquez pour parcourir",
+    "startConversion": "Convertir en WAV",
+    "dropzone": {
+      "title": "Déposez vos fichiers MP3 ici",
+      "or": "ou",
+      "browse": "Parcourir les fichiers",
+      "description": "Taille maximale de fichier : 100MB",
+      "subtitle": "ou cliquez pour parcourir",
+      "hint": "Prend en charge les fichiers MP3 jusqu'à 100MB",
+      "selected": "Fichier sélectionné"
+    },
+    "settings": {
+      "title": "Paramètres de conversion",
+      "description": "Configurez les paramètres audio pour la conversion",
+      "sampleRate": {
+        "label": "Taux d'échantillonnage",
+        "description": "Des taux d'échantillonnage plus élevés capturent plus de détails audio"
+      },
+      "bitDepth": {
+        "label": "Profondeur de bits",
+        "description": "Une profondeur de bits plus élevée offre une meilleure plage dynamique"
+      },
+      "channels": {
+        "label": "Canaux",
+        "description": "Choisissez entre sortie stéréo et mono",
+        "stereo": "Stéréo",
+        "mono": "Mono"
+      },
+      "volume": "Volume",
+      "trim": "Découper l'audio"
+    },
+    "buttons": {
+      "convert": "Convertir en WAV",
+      "download": "Télécharger WAV",
+      "share": "Partager",
+      "preview": "Aperçu"
+    },
+    "status": {
+      "converting": "Conversion en cours...",
+      "uploadingFile": "Téléchargement du fichier...",
+      "preparingDownload": "Préparation du téléchargement...",
+      "readyToDownload": "Prêt à télécharger",
+      "conversionSuccess": "MP3 converti avec succès en WAV !",
+      "conversionFailed": "Échec de la conversion. Veuillez réessayer."
+    },
+    "waveform": {
+      "dragHint": "Faites glisser les marqueurs verts et rouges pour ajuster le découpage",
+      "playing": "Lecture",
+      "paused": "En pause",
+      "play": "Lire",
+      "pause": "Pause"
+    }
+  },
+  "history": {
+    "metaTitle": "Historique de conversion MP3 vers WAV",
+    "title": "Historique de conversion",
+    "actions": {
+      "refresh": "Actualiser",
+      "clear": "Effacer l'historique",
+      "download": "Télécharger",
+      "share": "Partager",
+      "delete": "Supprimer"
+    },
+    "card": {
+      "title": "Votre historique de conversion",
+      "description": "Vos conversions récentes de MP3 vers WAV. Les fichiers expirent automatiquement 24 heures après leur création."
+    },
+    "empty": {
+      "title": "Aucun historique trouvé",
+      "description": "Les conversions apparaîtront ici après avoir converti des fichiers MP3"
+    },
+    "table": {
+      "filename": "Nom de fichier",
+      "convertedAt": "Converti le",
+      "expiration": "Expiration",
+      "size": "Taille",
+      "actions": "Actions",
+      "storage": "Stockage"
+    },
+    "status": {
+      "active": "Actif",
+      "expired": "Expiré",
+      "expiresIn": "Expire dans"
+    },
+    "storage": {
+      "local": "Local",
+      "cloud": "Cloud"
+    },
+    "dialogs": {
+      "deleteConfirm": {
+        "title": "Supprimer la conversion",
+        "description": "Voulez-vous vraiment supprimer cette conversion de votre historique ?",
+        "cancel": "Annuler",
+        "confirm": "Supprimer"
+      },
+      "delete": {
+        "title": "Confirmer la suppression",
+        "description": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+        "cancel": "Annuler",
+        "confirm": "Supprimer"
+      }
+    },
+    "toast": {
+      "cleared": {
+        "title": "Historique effacé",
+        "description": "Toutes les entrées de l'historique ont été supprimées"
+      },
+      "refreshed": {
+        "title": "Historique actualisé",
+        "description": "Les entrées d'historique expirées ont été nettoyées"
+      },
+      "download": {
+        "started": {
+          "title": "Téléchargement démarré",
+          "description": "Votre fichier est en cours de préparation pour le téléchargement"
+        }
+      }
+    },
+    "faq": {
+      "title": "FAQ sur l'historique",
+      "storage": {
+        "question": "Où est stocké mon historique ?",
+        "answer": "L'historique de conversion est stocké dans le stockage local de votre navigateur et n'est pas téléchargé sur un serveur. La suppression des données de votre navigateur effacera cet historique."
+      },
+      "disappear": {
+        "question": "Pourquoi mon historique a-t-il disparu ?",
+        "answer": "Les entrées de conversion expirent automatiquement 24 heures après leur création pour s'assurer que votre navigateur ne stocke pas trop de données. Vous pouvez également effacer manuellement votre historique à tout moment."
+      },
+      "download": {
+        "question": "Comment télécharger les fichiers convertis ?",
+        "answer": "Dans la liste d'historique, chaque entrée de conversion a un bouton de téléchargement sur la droite. Cliquez dessus pour télécharger le fichier WAV converti."
+      },
+      "delete": {
+        "question": "Comment supprimer des entrées individuelles de l'historique ?",
+        "answer": "La suppression d'entrées individuelles de l'historique n'est pas prise en charge actuellement. Vous pouvez utiliser le bouton 'Effacer l'historique' pour supprimer toutes les entrées, ou attendre qu'elles expirent automatiquement après 24 heures."
+      }
+    }
+  },
+  "faq": {
+    "title": "Questions fréquentes",
+    "questions": {
+      "howToConvert": {
+        "question": "Comment convertir un MP3 en WAV ?",
+        "answer": "Pour convertir un MP3 en WAV, téléchargez simplement votre fichier MP3 en le glissant-déposant dans la zone de téléchargement ou en cliquant pour parcourir vos fichiers. Ensuite, cliquez sur le bouton 'Convertir en WAV'. Une fois la conversion terminée, vous pourrez télécharger votre fichier WAV avec le même nom que l'original mais avec l'extension .wav. Le processus complet ne prend que quelques secondes et se déroule directement dans votre navigateur."
+      },
+      "storageTime": {
+        "question": "Combien de temps mes fichiers convertis sont-ils stockés ?",
+        "answer": "Vos fichiers WAV convertis sont stockés en toute sécurité sur nos serveurs pendant 24 heures. Cela vous donne suffisamment de temps pour télécharger ou partager vos fichiers. Après 24 heures, les fichiers sont automatiquement supprimés de notre système pour préserver la confidentialité et optimiser l'espace de stockage. Nous vous recommandons de télécharger vos fichiers convertis dès que possible ou d'utiliser la fonction de lien de partage pour vous assurer de ne pas perdre l'accès à vos conversions."
+      },
+      "losslessConversion": {
+        "question": "Comment convertir un fichier MP3 en WAV sans perdre de qualité ?",
+        "answer": "Pour convertir sans perte de qualité supplémentaire, utilisez notre convertisseur avec les paramètres les plus élevés de fréquence d'échantillonnage et de profondeur de bits. Rappelez-vous que la qualité originale du MP3 est déjà compressée, et la conversion en WAV préserve cette qualité existante mais ne peut pas restaurer les informations déjà perdues lors de la compression MP3 initiale."
+      },
+      "improveQuality": {
+        "question": "La conversion de MP3 en WAV améliore-t-elle la qualité sonore ?",
+        "answer": "La conversion de MP3 en WAV n'améliore pas la qualité sonore d'origine. Le format WAV est un format non compressé qui préserve la qualité telle quelle, mais il ne peut pas récupérer les informations perdues lors de la compression MP3 initiale. Cependant, le WAV est meilleur pour l'édition et le traitement ultérieurs."
+      },
+      "fileSize": {
+        "question": "Pourquoi le fichier WAV est-il beaucoup plus volumineux que le MP3 ?",
+        "answer": "Les fichiers WAV sont nettement plus volumineux car ils sont non compressés et stockent les données audio complètes sans perte. Le MP3 est un format compressé qui réduit la taille du fichier en supprimant certaines données audio. Un fichier WAV peut être 10 fois plus grand que son équivalent MP3 tout en préservant la qualité audio complète."
+      },
+      "bestSoftware": {
+        "question": "Quel est le meilleur logiciel gratuit pour convertir MP3 en WAV ?",
+        "answer": "Pour les conversions en ligne, notre convertisseur gratuit offre des résultats de haute qualité sans installation. Pour une utilisation sur ordinateur, des logiciels gratuits comme Audacity (open source avec de nombreuses fonctionnalités), VLC Media Player (facile à utiliser) et FFmpeg (pour les utilisateurs expérimentés en ligne de commande) sont d'excellentes options. Tous ces outils fournissent des conversions de haute qualité."
+      },
+      "onlineVsOffline": {
+        "question": "Est-il préférable de convertir MP3 en WAV en ligne ou avec un logiciel de bureau ?",
+        "answer": "Les convertisseurs en ligne comme le nôtre sont idéaux pour des conversions rapides et pratiques sans installation. Les logiciels de bureau peuvent offrir des fonctionnalités plus avancées et le traitement par lots, mais nécessitent une installation et une configuration. La qualité de conversion est comparable si vous utilisez des outils fiables."
+      },
+      "windowsConversion": {
+        "question": "Comment convertir MP3 en WAV sur Windows sans logiciel supplémentaire ?",
+        "answer": "Les utilisateurs Windows peuvent convertir MP3 en WAV sans installer de logiciel supplémentaire en utilisant notre convertisseur en ligne directement dans n'importe quel navigateur. Si vous préférez utiliser des outils intégrés, Windows Media Player peut également effectuer des conversions simples de MP3 en WAV."
+      },
+      "bestSettings": {
+        "question": "Quels sont les meilleurs paramètres pour la conversion MP3 vers WAV ?",
+        "answer": "Pour une qualité optimale, utilisez une fréquence d'échantillonnage de 44,1 kHz ou 48 kHz (correspondant au MP3 d'origine), une profondeur de 16 ou 24 bits, et conservez la configuration de canal d'origine (stéréo/mono). Ces paramètres assurent une qualité audio optimale pour la plupart des usages tout en gardant les fichiers gérables."
+      },
+      "conversionTime": {
+        "question": "Combien de temps faut-il pour convertir un fichier MP3 en WAV ?",
+        "answer": "Le temps de conversion dépend de la taille du fichier et de votre connexion Internet. La plupart des conversions ne prennent que quelques secondes. Les fichiers plus volumineux (approchant notre limite de 100 Mo) peuvent prendre un peu plus de temps, mais généralement moins d'une minute avec une connexion Internet standard."
+      }
+    }
+  },
+  "features": {
+    "title": "Caractéristiques principales",
+    "privacy": {
+      "title": "Confidentialité",
+      "description": "Vos fichiers sont convertis directement dans votre navigateur. Pas besoin de les télécharger sur des serveurs externes !"
+    },
+    "speed": {
+      "title": "Conversion rapide",
+      "description": "Convertissez MP3 en WAV en quelques secondes grâce à notre traitement optimisé côté client."
+    },
+    "settings": {
+      "title": "Paramètres avancés",
+      "description": "Personnalisez le volume, le taux d'échantillonnage, les canaux, la profondeur de bits et découpez votre audio."
+    },
+    "sharing": {
+      "title": "Partage facile",
+      "description": "Partagez vos fichiers WAV convertis avec un lien simple que d'autres peuvent télécharger."
+    },
+    "storage": {
+      "title": "Stockage de 24 heures",
+      "description": "Tous les fichiers convertis sont stockés en toute sécurité pendant 24 heures, vous donnant suffisamment de temps pour télécharger et partager."
+    },
+    "quality": {
+      "title": "Haute qualité",
+      "description": "Préservez la meilleure qualité possible de vos fichiers MP3 lors de la conversion au format WAV."
+    }
+  },
+  "header": {
+    "home": "Accueil",
+    "language": "Langue",
+    "history": "Historique",
+    "theme": "Thème",
+    "github": "GitHub",
+    "feedback": "Commentaires"
+  },
+  "footer": {
+    "copyright": "© 2024 Convertisseur MP3 vers WAV. Tous droits réservés.",
+    "privacyPolicy": "Politique de confidentialité",
+    "termsOfService": "Conditions d'utilisation"
+  },
+  "share": {
+    "title": "Partager un fichier audio",
+    "description": "Créer un lien pour partager votre fichier WAV converti",
+    "copyLink": "Copier le lien",
+    "linkCopied": "Lien copié dans le presse-papiers !",
+    "expiry": "Le lien expire après 24 heures",
+    "hours": "heures",
+    "minutes": "minutes",
+    "seconds": "secondes",
+    "expired": "Expiré",
+    "success": {
+      "title": "Fichier partagé avec succès !",
+      "description": "Le fichier audio a été téléchargé et est prêt à être partagé. Le lien est valide pendant 24 heures."
+    },
+    "file": {
+      "title": "Fichier partagé",
+      "download": "Télécharger"
+    },
+    "link": {
+      "title": "Lien de partage",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
+    "copied": {
+      "title": "Lien copié !",
+      "description": "Le lien de partage a été copié dans le presse-papiers.",
+      "failed": "Échec de la copie",
+      "error": "Impossible de copier dans le presse-papiers."
+    },
+    "download": {
+      "failed": "Échec du téléchargement",
+      "error": "Impossible de télécharger le fichier. Veuillez réessayer."
+    },
+    "access": {
+      "title": "Accéder au fichier partagé",
+      "pageTitle": "Accéder au fichier partagé",
+      "description": "Entrez l'ID de partage pour accéder au fichier audio partagé.",
+      "placeholder": "Entrez l'ID de partage...",
+      "button": "Accéder",
+      "hint": "Vous pouvez utiliser l'ID de partage ou le lien complet pour accéder au fichier partagé."
+    },
+    "notFound": {
+      "title": "Partage non trouvé",
+      "description": "Le fichier partagé n'existe pas ou a expiré.",
+      "button": "Retour à l'accueil"
+    },
+    "failed": "Échec du partage",
+    "error": "Impossible de partager le fichier. Veuillez réessayer.",
+    "uploadWarning": "Échec du téléchargement vers le cloud",
+    "usingLocal": "Utilisation du fichier local à la place. Ce lien ne fonctionnera que sur votre appareil actuel."
+  },
+  "download": {
+    "title": "Téléchargez votre fichier WAV",
+    "pageTitle": "Téléchargez vos fichiers WAV convertis",
+    "pageDescription": "Accédez à vos conversions MP3 vers WAV en saisissant votre ID de téléchargement ou URL.",
+    "accessDownloads": "Accéder à vos téléchargements",
+    "enterIdInstructions": "Entrez votre ID de téléchargement ou collez votre URL de téléchargement",
+    "idPlaceholder": "Entrez l'ID de téléchargement (ex. m8rfqnpuprcwaox)",
+    "goButton": "Aller",
+    "extractIdFromUrl": "Extraire l'ID de l'URL",
+    "downloadExpiration": "Les liens de téléchargement sont valides pendant 24 heures après la conversion.",
+    "readyToDownload": "Votre fichier est prêt à être téléchargé",
+    "downloadNow": "Télécharger maintenant",
+    "downloadAgain": "Télécharger à nouveau",
+    "share": "Partager",
+    "viewInBrowser": "Voir dans le navigateur",
+    "expiresIn": "Expire dans",
+    "expired": "Expiré",
+    "hours": "h",
+    "minutes": "m",
+    "whatNext": "Et maintenant ?",
+    "convertMore": "Voulez-vous convertir plus de fichiers ?",
+    "backToHome": "Retour à l'accueil",
+    "loading": "Préparation de votre téléchargement",
+    "fileNotFound": "Le fichier demandé n'a pas pu être trouvé.",
+    "success": {
+      "title": "Téléchargement démarré",
+      "description": "Le téléchargement de votre fichier a commencé. S'il ne démarre pas automatiquement, cliquez à nouveau sur le bouton de téléchargement."
+    },
+    "error": {
+      "title": "Erreur de téléchargement",
+      "description": "Un problème est survenu avec votre téléchargement. Veuillez réessayer.",
+      "emptyId": {
+        "title": "Aucun ID fourni",
+        "description": "Veuillez entrer un ID de téléchargement ou une URL."
+      },
+      "invalidId": {
+        "title": "ID de téléchargement invalide",
+        "description": "Le format de l'ID de téléchargement est incorrect."
+      },
+      "invalidUrl": {
+        "title": "URL invalide",
+        "description": "Impossible d'extraire un ID de téléchargement valide de cette URL."
+      }
+    },
+    "notFound": {
+      "title": "Fichier non trouvé",
+      "description": "Le fichier que vous recherchez n'existe pas ou a expiré."
+    },
+    "share": {
+      "title": "Convertisseur MP3 vers WAV",
+      "text": "Découvrez mon fichier WAV converti !",
+      "copied": {
+        "title": "Lien copié",
+        "description": "Lien de partage copié dans le presse-papiers !"
+      },
+      "error": {
+        "title": "Erreur de partage",
+        "description": "Un problème est survenu lors du partage de ce fichier."
+      }
+    },
+    "faq": {
+      "title": "Foire aux questions",
+      "whereIsId": {
+        "question": "Où puis-je trouver mon ID de téléchargement ?",
+        "answer": "Votre ID de téléchargement est fourni sur la page de résultats de conversion après avoir converti un fichier MP3. Il est également inclus dans l'URL de téléchargement et dans tous les liens de partage que vous créez."
+      },
+      "howLongAvailable": {
+        "question": "Combien de temps mes fichiers convertis sont-ils disponibles ?",
+        "answer": "Vos fichiers convertis sont disponibles pendant 24 heures après la conversion. Après cette période, ils sont automatiquement supprimés de nos serveurs."
+      },
+      "convertAnother": {
+        "question": "Puis-je convertir un autre fichier ?",
+        "answer": "Oui ! Vous pouvez convertir autant de fichiers que nécessaire. Retournez simplement à la page d'accueil pour commencer une nouvelle conversion.",
+        "link": "Convertir un autre fichier"
+      },
+      "fileSize": {
+        "question": "Y a-t-il une limite de taille de fichier ?",
+        "answer": "Oui, la taille maximale de fichier pour la conversion est de 100 Mo pour les fichiers MP3. Cette limite garantit des performances optimales et des temps de conversion rapides."
+      },
+      "sharing": {
+        "question": "Puis-je partager mes fichiers convertis avec d'autres personnes ?",
+        "answer": "Oui ! Après avoir converti un fichier, vous pouvez créer un lien de partage que d'autres peuvent utiliser pour télécharger votre fichier WAV converti. Ces liens de partage sont valides pendant 24 heures."
+      }
+    }
+  },
+  "usageGuide": {
+    "title": "Comment convertir MP3 en WAV",
+    "steps": {
+      "upload": {
+        "title": "Téléversez votre fichier MP3",
+        "description": "Glissez-déposez votre fichier MP3 dans la zone de téléversement ou cliquez pour parcourir vos fichiers."
+      },
+      "settings": {
+        "title": "Ajustez les paramètres (optionnel)",
+        "description": "Personnalisez le volume, le taux d'échantillonnage, les canaux, la profondeur de bits et découpez l'audio si nécessaire."
+      },
+      "convert": {
+        "title": "Convertir en WAV",
+        "description": "Cliquez sur le bouton de conversion et attendez que le processus se termine."
+      },
+      "download": {
+        "title": "Télécharger ou partager",
+        "description": "Téléchargez votre fichier WAV converti ou partagez le lien avec d'autres."
+      }
+    }
+  },
+  "relatedArticles": {
+    "title": "Articles Connexes",
+    "articles": {
+      "formats": {
+        "title": "MP3 vs WAV : Comprendre les formats audio",
+        "description": "Découvrez les principales différences entre les formats audio MP3 et WAV et quand utiliser chacun d'eux.",
+        "readMore": "Lire l'article"
+      },
+      "sampleRates": {
+        "title": "Meilleurs taux d'échantillonnage pour la production audio",
+        "description": "Découvrez les taux d'échantillonnage idéaux pour différents scénarios de production audio et comment ils affectent la qualité.",
+        "readMore": "Lire l'article"
+      }
+    }
+  },
+  "otherTools": {
+    "title": "Autres outils de conversion audio",
+    "tools": {
+      "wavToMp3": "WAV vers MP3",
+      "mp3ToFlac": "MP3 vers FLAC",
+      "wavToOgg": "WAV vers OGG",
+      "mp4ToMp3": "MP4 vers MP3",
+      "audioEditor": "Éditeur audio",
+      "audioTrimmer": "Découpeur audio",
+      "audioNormalizer": "Normaliseur audio",
+      "moreTools": "Plus d'outils"
+    }
+  }
+} 

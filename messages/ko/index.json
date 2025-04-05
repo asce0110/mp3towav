@@ -1,0 +1,471 @@
+{
+  "app": {
+    "title": "MP3에서 WAV로 변환기 | 무료 온라인 오디오 도구",
+    "description": "무료 MP3에서 WAV로 변환기. 사용자 지정 샘플 레이트, 비트 깊이 및 볼륨 설정으로 온라인에서 오디오 파일을 변환하세요. 완벽한 오디오 품질을 위해 설치가 필요 없습니다."
+  },
+  "common": {
+    "loading": "로딩 중...",
+    "error": "오류",
+    "success": "성공",
+    "title": "MP3에서 WAV로 변환기",
+    "description": "MP3 오디오 파일을 WAV 형식으로 변환하는 무료 온라인 도구",
+    "waiting": "기다리는 중...",
+    "processing": "처리 중...",
+    "back": "뒤로",
+    "next": "다음",
+    "continue": "계속",
+    "close": "닫기",
+    "submit": "제출",
+    "save": "저장",
+    "delete": "삭제",
+    "download": "다운로드",
+    "share": "공유",
+    "reset": "재설정",
+    "apply": "적용",
+    "preview": "미리보기",
+    "cancel": "취소",
+    "upload": "업로드",
+    "confirm": "확인"
+  },
+  "converter": {
+    "title": "MP3에서 WAV로 변환기",
+    "subtitle": "무료 온라인 오디오 변환기",
+    "description": "무료 온라인 도구로 MP3 오디오 파일을 WAV 형식으로 변환하세요",
+    "uploadTitle": "MP3 파일 업로드",
+    "uploadSubtitle": "여기에 파일을 끌어다 놓거나 클릭하여 찾아보기",
+    "startConversion": "WAV로 변환",
+    "dropzone": {
+      "title": "MP3 파일을 여기에 끌어다 놓으세요",
+      "or": "또는",
+      "browse": "파일 찾아보기",
+      "description": "최대 파일 크기: 100MB",
+      "subtitle": "또는 클릭하여 파일 찾아보기",
+      "hint": "최대 100MB의 MP3 파일 지원",
+      "selected": "파일 선택됨"
+    },
+    "settings": {
+      "title": "변환 설정",
+      "description": "변환을 위한 오디오 설정 구성",
+      "sampleRate": {
+        "label": "샘플 레이트",
+        "description": "높은 샘플 레이트로 더 많은 오디오 세부 정보 캡처"
+      },
+      "bitDepth": {
+        "label": "비트 깊이",
+        "description": "높은 비트 깊이로 더 나은 다이나믹 레인지 제공"
+      },
+      "channels": {
+        "label": "채널",
+        "description": "스테레오와 모노 출력 중 선택",
+        "stereo": "스테레오",
+        "mono": "모노"
+      },
+      "volume": "볼륨",
+      "trim": "오디오 트리밍"
+    },
+    "buttons": {
+      "convert": "WAV로 변환",
+      "download": "WAV 다운로드",
+      "share": "공유",
+      "preview": "미리 듣기"
+    },
+    "status": {
+      "converting": "변환 중...",
+      "uploadingFile": "파일 업로드 중...",
+      "preparingDownload": "다운로드 준비 중...",
+      "readyToDownload": "다운로드 준비 완료",
+      "conversionSuccess": "MP3가 WAV로 성공적으로 변환되었습니다!",
+      "conversionFailed": "변환에 실패했습니다. 다시 시도해 주세요."
+    },
+    "waveform": {
+      "dragHint": "녹색 및 빨간색 마커를 드래그하여 트리밍 조정",
+      "playing": "재생 중",
+      "paused": "일시 중지됨",
+      "play": "재생",
+      "pause": "일시 중지"
+    },
+    "questions": {
+      "howToConvert": {
+        "question": "MP3를 WAV로 어떻게 변환하나요?",
+        "answer": "MP3를 WAV로 변환하려면 업로드 영역에 MP3 파일을 드래그 앤 드롭하거나 클릭하여 파일을 찾아보세요. 그런 다음 'WAV로 변환' 버튼을 클릭하세요. 변환이 완료되면 원본과 같은 이름으로 확장자가 .wav인 WAV 파일을 다운로드할 수 있습니다. 전체 과정은 몇 초 만에 브라우저에서 직접 이루어집니다."
+      },
+      "storageTime": {
+        "question": "변환된 파일은 얼마나 오래 저장되나요?",
+        "answer": "변환된 WAV 파일은 서버에 24시간 동안 안전하게 저장됩니다. 이 시간 동안 파일을 다운로드하거나 다른 사람과 공유할 수 있습니다. 24시간 후에는 개인 정보 보호 및 저장 공간 최적화를 위해 파일이 시스템에서 자동으로 삭제됩니다. 변환된 파일을 가능한 빨리 다운로드하거나 공유 링크 기능을 사용하여 변환 접근권한을 잃지 않도록 하는 것이 좋습니다."
+      }
+    }
+  },
+  "history": {
+    "metaTitle": "MP3에서 WAV로 변환 기록",
+    "title": "변환 기록",
+    "actions": {
+      "refresh": "새로고침",
+      "clear": "기록 지우기",
+      "download": "다운로드",
+      "share": "공유",
+      "delete": "삭제"
+    },
+    "card": {
+      "title": "변환 기록",
+      "description": "최근 MP3에서 WAV로 변환한 기록입니다. 파일은 생성 후 24시간 후에 자동으로 만료됩니다."
+    },
+    "empty": {
+      "title": "기록을 찾을 수 없음",
+      "description": "MP3 파일을 변환하면 여기에 표시됩니다"
+    },
+    "table": {
+      "filename": "파일 이름",
+      "convertedAt": "변환 시간",
+      "expiration": "만료",
+      "size": "크기",
+      "actions": "작업",
+      "storage": "저장소"
+    },
+    "status": {
+      "active": "활성",
+      "expired": "만료됨",
+      "expiresIn": "만료 시간"
+    },
+    "storage": {
+      "local": "로컬",
+      "cloud": "클라우드"
+    },
+    "dialogs": {
+      "deleteConfirm": {
+        "title": "변환 삭제",
+        "description": "정말로 이 변환을 기록에서 삭제하시겠습니까?",
+        "cancel": "취소",
+        "confirm": "삭제"
+      },
+      "delete": {
+        "title": "삭제 확인",
+        "description": "이 항목을 삭제하시겠습니까?",
+        "cancel": "취소",
+        "confirm": "삭제"
+      }
+    },
+    "toast": {
+      "cleared": {
+        "title": "기록 삭제됨",
+        "description": "모든 기록이 삭제되었습니다"
+      },
+      "refreshed": {
+        "title": "기록 새로고침됨",
+        "description": "만료된 기록이 정리되었습니다"
+      },
+      "download": {
+        "started": {
+          "title": "다운로드 시작됨",
+          "description": "파일이 다운로드를 위해 준비 중입니다"
+        }
+      }
+    },
+    "faq": {
+      "title": "기록에 관한 자주 묻는 질문",
+      "storage": {
+        "question": "내 기록은 어디에 저장되나요?",
+        "answer": "변환 기록은 브라우저의 로컬 스토리지에 저장되며 서버에 업로드되지 않습니다. 브라우저 데이터를 지우면 이 기록도 삭제됩니다."
+      },
+      "disappear": {
+        "question": "왜 내 기록이 사라졌나요?",
+        "answer": "변환 기록은 브라우저에 너무 많은 데이터가 저장되지 않도록 생성 후 24시간 후에 자동으로 만료됩니다. 언제든지 수동으로 기록을 지울 수도 있습니다."
+      },
+      "download": {
+        "question": "변환된 파일을 어떻게 다운로드하나요?",
+        "answer": "기록 목록에서 각 변환 항목의 오른쪽에 다운로드 버튼이 있습니다. 클릭하여 변환된 WAV 파일을 다운로드할 수 있습니다."
+      },
+      "delete": {
+        "question": "개별 기록 항목을 어떻게 삭제하나요?",
+        "answer": "현재 개별 기록 항목 삭제는 지원되지 않습니다. '기록 지우기' 버튼을 사용하여 모든 기록을 삭제하거나, 24시간 후에 자동으로 만료되기를 기다릴 수 있습니다."
+      }
+    }
+  },
+  "features": {
+    "title": "주요 기능",
+    "privacy": {
+      "title": "개인 정보 보호",
+      "description": "파일은 브라우저에서 직접 변환됩니다. 외부 서버에 업로드할 필요가 없습니다!"
+    },
+    "speed": {
+      "title": "빠른 변환",
+      "description": "최적화된 클라이언트 측 처리로 MP3를 WAV로 몇 초 만에 변환합니다."
+    },
+    "settings": {
+      "title": "고급 설정",
+      "description": "볼륨, 샘플 레이트, 채널, 비트 깊이를 사용자 지정하고 오디오를 트리밍합니다."
+    },
+    "sharing": {
+      "title": "쉬운 공유",
+      "description": "변환된 WAV 파일을 다른 사람이 다운로드할 수 있는 간단한 링크로 공유합니다."
+    },
+    "storage": {
+      "title": "24시간 저장",
+      "description": "모든 변환된 파일은 24시간 동안 안전하게 저장되어 다운로드 및 공유할 시간이 충분합니다."
+    },
+    "quality": {
+      "title": "고품질",
+      "description": "WAV 형식으로 변환할 때 MP3 파일에서 가능한 최상의 품질을 유지합니다."
+    }
+  },
+  "faq": {
+    "title": "자주 묻는 질문",
+    "questions": {
+      "howToConvert": {
+        "question": "MP3를 WAV로 어떻게 변환하나요?",
+        "answer": "MP3를 WAV로 변환하려면 업로드 영역에 MP3 파일을 드래그 앤 드롭하거나 클릭하여 파일을 찾아보세요. 그런 다음 'WAV로 변환' 버튼을 클릭하세요. 변환이 완료되면 원본과 같은 이름으로 확장자가 .wav인 WAV 파일을 다운로드할 수 있습니다. 전체 과정은 몇 초 만에 브라우저에서 직접 이루어집니다."
+      },
+      "storageTime": {
+        "question": "변환된 파일은 얼마나 오래 저장되나요?",
+        "answer": "변환된 WAV 파일은 서버에 24시간 동안 안전하게 저장됩니다. 이 시간 동안 파일을 다운로드하거나 다른 사람과 공유할 수 있습니다. 24시간 후에는 개인 정보 보호 및 저장 공간 최적화를 위해 파일이 시스템에서 자동으로 삭제됩니다. 변환된 파일을 가능한 빨리 다운로드하거나 공유 링크 기능을 사용하여 변환 접근권한을 잃지 않도록 하는 것이 좋습니다."
+      },
+      "conversionMethod": {
+        "question": "MP3를 WAV로 어떻게 변환하나요?",
+        "answer": "MP3를 WAV로 변환하는 가장 쉬운 방법은 저희 사이트와 같은 온라인 변환기를 사용하는 것입니다. 파일을 업로드하고 '변환' 버튼을 클릭하기만 하면 몇 초 내에 WAV 파일이 생성됩니다. 데스크톱에서는 Audacity, VLC, iTunes, FFmpeg 같은 소프트웨어도 사용할 수 있습니다."
+      },
+      "fileSize": {
+        "question": "MP3에서 WAV로 변환하면 파일 크기가 어떻게 변하나요?",
+        "answer": "WAV 파일은 비압축 형식이기 때문에 MP3에서 변환하면 원본 파일보다 크기가 크게 증가합니다. 일반적으로 WAV 파일은 MP3의 약 10배 크기가 될 수 있습니다. 예를 들어, 10MB MP3 파일은 변환 후 약 100MB 정도의 WAV 파일이 될 수 있습니다."
+      },
+      "improveQuality": {
+        "question": "MP3를 WAV로 변환하면 음질이 개선되나요?",
+        "answer": "MP3를 WAV로 변환하면 원본 음질이 개선되지는 않습니다. WAV는 비압축 형식이지만, 이미 MP3 압축 과정에서 손실된 정보를 복원할 수는 없습니다. 하지만 WAV는 오디오 편집이나 추가 처리 시 품질 저하를 방지하는 데 유용합니다."
+      },
+      "onlineVsOffline": {
+        "question": "온라인과 오프라인 변환 방식 중 어느 것이 더 좋나요?",
+        "answer": "온라인 변환기는 소프트웨어 설치 없이 빠르고 쉽게 변환할 수 있는 장점이 있습니다. 오프라인 데스크톱 소프트웨어는 개인정보 보호가 강화되고, 인터넷 연결 없이 사용할 수 있으며, 일반적으로 배치 처리와 같은 고급 기능을 제공합니다. 선택은 편의성과 개인정보 보호의 균형에 따라 달라집니다."
+      },
+      "bestSoftware": {
+        "question": "MP3를 WAV로 변환하는 최고의 무료 소프트웨어는 무엇인가요?",
+        "answer": "온라인에서는 저희 사이트의 변환기가 등록 없이 고품질 변환을 제공합니다. 데스크톱에서는 Audacity(오픈 소스로 기능이 풍부), VLC Media Player(간단하고 사용하기 쉬움), FFmpeg(명령줄 작업에 익숙한 사용자용)가 인기 있는 무료 옵션입니다. 이 모든 도구는 고품질의 변환 결과를 제공합니다."
+      },
+      "bestSettings": {
+        "question": "MP3에서 WAV로 변환할 때 최적의 설정은 무엇인가요?",
+        "answer": "최상의 품질을 얻으려면 원본 MP3와 동일한 샘플 레이트(일반적으로 44.1kHz 또는 48kHz)를 사용하고 비트 깊이는 16비트 또는 24비트를 선택하세요. 또한 원래의 채널 구성(스테레오/모노)을 유지하는 것이 좋습니다. 이러한 설정은 파일을 관리 가능한 크기로 유지하면서 대부분의 목적에 맞는 최적의 오디오 품질을 보장합니다."
+      },
+      "losslessConversion": {
+        "question": "MP3를 WAV로 변환할 때 품질 손실 없이 변환하는 방법이 있나요?",
+        "answer": "MP3는 이미 압축 형식이므로 WAV로 변환할 때 원래의 비압축 품질을 완전히 복원할 수 없습니다. 그러나 추가적인 품질 저하를 방지하려면 원본 MP3와 동일하거나 더 높은 샘플 레이트와 비트 깊이를 선택하고 고품질 변환 도구를 사용하세요. 저희 사이트의 변환 도구는 최적의 변환 품질을 유지하도록 설계되었습니다."
+      },
+      "conversionTime": {
+        "question": "변환하는 데 시간이 얼마나 걸리나요?",
+        "answer": "변환 시간은 파일 크기와 인터넷 연결 속도에 따라 다릅니다. 일반적인 5분 MP3 파일(약 10MB)의 경우, 변환은 몇 초에서 30초 정도 걸립니다. 더 큰 파일은 시간이 더 걸릴 수 있지만, 저희 사이트의 최대 100MB 파일도 일반적으로 1분 이내에 변환이 완료됩니다."
+      },
+      "windowsConversion": {
+        "question": "Windows에서 앱을 설치하지 않고 파일을 변환할 수 있나요?",
+        "answer": "네, 저희 사이트와 같은 온라인 MP3-WAV 변환기를 사용하면 Windows에 소프트웨어를 설치하지 않고도 파일을 변환할 수 있습니다. 브라우저에서 사이트에 접속하고, MP3 파일을 업로드한 다음, 변환 버튼을 클릭하기만 하면 됩니다. 과정은 브라우저 내에서 완료되며, 변환된 WAV 파일을 다운로드할 수 있습니다. 이는 Windows 사용자에게 가장 쉽고 빠른 방법입니다."
+      }
+    }
+  },
+  "header": {
+    "home": "홈",
+    "language": "언어",
+    "history": "기록",
+    "theme": "테마",
+    "github": "GitHub",
+    "feedback": "피드백"
+  },
+  "footer": {
+    "copyright": "© 2024 MP3에서 WAV로 변환기. 모든 권리 보유.",
+    "privacyPolicy": "개인정보 처리방침",
+    "termsOfService": "서비스 약관"
+  },
+  "share": {
+    "title": "오디오 파일 공유",
+    "description": "변환된 WAV 파일을 공유하기 위한 링크 생성",
+    "copyLink": "링크 복사",
+    "linkCopied": "링크가 클립보드에 복사되었습니다!",
+    "expiry": "링크는 24시간 후에 만료됩니다",
+    "hours": "시간",
+    "minutes": "분",
+    "seconds": "초",
+    "expired": "만료됨",
+    "success": {
+      "title": "파일 공유 성공!",
+      "description": "오디오 파일이 업로드되어 공유할 준비가 되었습니다. 링크는 24시간 동안 유효합니다."
+    },
+    "file": {
+      "title": "공유 파일",
+      "download": "다운로드"
+    },
+    "link": {
+      "title": "공유 링크",
+      "copy": "복사",
+      "copied": "복사됨!"
+    },
+    "copied": {
+      "title": "링크가 복사되었습니다!",
+      "description": "공유 링크가 클립보드에 복사되었습니다.",
+      "failed": "복사 실패",
+      "error": "클립보드에 복사할 수 없습니다."
+    },
+    "download": {
+      "failed": "다운로드 실패",
+      "error": "파일을 다운로드할 수 없습니다. 다시 시도해 주세요."
+    },
+    "access": {
+      "title": "공유 파일 접근",
+      "pageTitle": "공유 파일 접근",
+      "description": "공유 ID를 입력하여 공유된 오디오 파일에 접근하세요.",
+      "placeholder": "공유 ID 입력...",
+      "button": "접근",
+      "hint": "공유 ID 또는 전체 링크를 사용하여 공유 파일에 접근할 수 있습니다."
+    },
+    "notFound": {
+      "title": "공유를 찾을 수 없음",
+      "description": "공유 파일이 존재하지 않거나 만료되었습니다.",
+      "button": "홈으로 돌아가기"
+    },
+    "failed": "공유 실패",
+    "error": "파일을 공유할 수 없습니다. 다시 시도해 주세요.",
+    "uploadWarning": "클라우드 업로드 실패",
+    "usingLocal": "대신 로컬 파일을 사용합니다. 이 링크는 현재 기기에서만 작동합니다."
+  },
+  "download": {
+    "title": "WAV 파일 다운로드",
+    "pageTitle": "변환된 WAV 파일 다운로드",
+    "pageDescription": "다운로드 ID 또는 URL을 입력하여 MP3에서 WAV로 변환한 파일에 접근하세요.",
+    "accessDownloads": "다운로드 접근",
+    "enterIdInstructions": "다운로드 ID를 입력하거나 다운로드 URL을 붙여넣으세요",
+    "idPlaceholder": "다운로드 ID 입력 (예: m8rfqnpuprcwaox)",
+    "goButton": "이동",
+    "extractIdFromUrl": "URL에서 ID 추출",
+    "downloadExpiration": "다운로드 링크는 변환 후 24시간 동안 유효합니다.",
+    "readyToDownload": "파일 다운로드 준비가 되었습니다",
+    "downloadNow": "지금 다운로드",
+    "downloadAgain": "다시 다운로드",
+    "share": {
+      "title": "공유",
+      "text": "내가 변환한 WAV 파일을 확인해 보세요!",
+      "copied": {
+        "title": "링크가 복사됨",
+        "description": "공유 링크가 클립보드에 복사되었습니다!"
+      },
+      "error": {
+        "title": "공유 오류",
+        "description": "이 파일을 공유하는 데 문제가 있었습니다."
+      }
+    },
+    "viewInBrowser": "브라우저에서 보기",
+    "expiresIn": "만료 시간",
+    "expired": "만료됨",
+    "hours": "시",
+    "minutes": "분",
+    "whatNext": "다음은 무엇인가요?",
+    "convertMore": "더 많은 파일을 변환하시겠습니까?",
+    "backToHome": "홈으로 돌아가기",
+    "loading": "다운로드 준비 중",
+    "fileNotFound": "요청한 파일을 찾을 수 없습니다.",
+    "success": {
+      "title": "다운로드 시작됨",
+      "description": "파일 다운로드가 시작되었습니다. 자동으로 시작되지 않으면 다운로드 버튼을 다시 클릭하세요."
+    },
+    "error": {
+      "title": "다운로드 오류",
+      "description": "다운로드에 문제가 있습니다. 다시 시도해 주세요.",
+      "emptyId": {
+        "title": "ID가 제공되지 않음",
+        "description": "다운로드 ID 또는 URL을 입력해 주세요."
+      },
+      "invalidId": {
+        "title": "잘못된 다운로드 ID",
+        "description": "다운로드 ID 형식이 올바르지 않습니다."
+      },
+      "invalidUrl": {
+        "title": "잘못된 URL",
+        "description": "이 URL에서 유효한 다운로드 ID를 추출할 수 없습니다."
+      }
+    },
+    "notFound": {
+      "title": "파일을 찾을 수 없음",
+      "description": "찾고 있는 파일이 존재하지 않거나 만료되었습니다."
+    },
+    "faq": {
+      "title": "자주 묻는 질문",
+      "whereIsId": {
+        "question": "다운로드 ID는 어디서 찾을 수 있나요?",
+        "answer": "다운로드 ID는 MP3 파일을 변환한 후 변환 결과 페이지에서 제공됩니다. 또한 다운로드 URL과 생성한 모든 공유 링크에도 포함되어 있습니다."
+      },
+      "howLongAvailable": {
+        "question": "변환된 파일은 얼마나 오래 사용할 수 있나요?",
+        "answer": "변환된 파일은 변환 후 24시간 동안 사용할 수 있습니다. 이 기간이 지나면 서버에서 자동으로 삭제됩니다."
+      },
+      "convertAnother": {
+        "question": "다른 파일을 변환할 수 있나요?",
+        "answer": "네! 필요한 만큼 많은 파일을 변환할 수 있습니다. 새 변환을 시작하려면 홈페이지로 돌아가면 됩니다.",
+        "link": "다른 파일 변환하기"
+      },
+      "fileSize": {
+        "question": "파일 크기 제한이 있나요?",
+        "answer": "네, MP3 파일의 최대 변환 파일 크기는 100MB입니다. 이 제한은 최적의 성능과 빠른 변환 시간을 보장합니다."
+      },
+      "sharing": {
+        "question": "변환된 파일을 다른 사람과 공유할 수 있나요?",
+        "answer": "네! 파일을 변환한 후 다른 사람이 변환된 WAV 파일을 다운로드하는 데 사용할 수 있는 공유 링크를 만들 수 있습니다. 이러한 공유 링크는 24시간 동안 유효합니다."
+      }
+    }
+  },
+  "featureSection": {
+    "title": "MP3에서 WAV로 변환기를 선택하는 이유",
+    "privacy": {
+      "title": "개인정보 중심",
+      "description": "필요한 경우가 아니면 서버에 업로드하지 않고 로컬에서 파일을 처리합니다."
+    },
+    "speed": {
+      "title": "초고속 변환",
+      "description": "최적화된 처리 엔진으로 MP3 파일을 몇 초 만에 WAV 형식으로 변환합니다."
+    },
+    "options": {
+      "title": "고급 옵션",
+      "description": "샘플 레이트, 비트 깊이, 채널 및 볼륨 컨트롤을 조정하여 오디오를 미세 조정할 수 있습니다."
+    }
+  },
+  "usageGuide": {
+    "title": "MP3를 WAV로 변환하는 방법",
+    "steps": {
+      "upload": {
+        "title": "MP3 파일 업로드",
+        "description": "업로드 영역에 MP3 파일을 드래그 앤 드롭하거나 클릭하여 파일을 찾아보세요."
+      },
+      "settings": {
+        "title": "설정 조정 (선택사항)",
+        "description": "필요에 따라 볼륨, 샘플 레이트, 채널, 비트 깊이를 조정하고 오디오를 트리밍하세요."
+      },
+      "convert": {
+        "title": "WAV로 변환",
+        "description": "변환 버튼을 클릭하고 프로세스가 완료될 때까지 기다리세요."
+      },
+      "download": {
+        "title": "다운로드 또는 공유",
+        "description": "변환된 WAV 파일을 다운로드하거나 다른 사람과 링크를 공유하세요."
+      }
+    }
+  },
+  "relatedArticles": {
+    "title": "관련 기사",
+    "articles": {
+      "formats": {
+        "title": "MP3 vs WAV: 오디오 형식의 이해",
+        "description": "MP3와 WAV 오디오 형식 간의 주요 차이점과 각각 언제 사용해야 하는지 알아보세요.",
+        "readMore": "기사 읽기"
+      },
+      "sampleRates": {
+        "title": "오디오 제작을 위한 최적의 샘플 레이트",
+        "description": "다양한 오디오 제작 시나리오에 대한 이상적인 샘플 레이트와 이것이 품질에 미치는 영향에 대해 알아보세요.",
+        "readMore": "기사 읽기"
+      }
+    }
+  },
+  "otherTools": {
+    "title": "기타 오디오 변환 도구",
+    "tools": {
+      "wavToMp3": "WAV에서 MP3로",
+      "mp3ToFlac": "MP3에서 FLAC으로",
+      "wavToOgg": "WAV에서 OGG로",
+      "mp4ToMp3": "MP4에서 MP3로",
+      "audioEditor": "오디오 편집기",
+      "audioTrimmer": "오디오 트리머",
+      "audioNormalizer": "오디오 노멀라이저",
+      "moreTools": "더 많은 도구"
+    }
+  }
+} 

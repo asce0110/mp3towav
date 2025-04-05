@@ -7,9 +7,19 @@ node_modules
 .vscode
 tmp/
 
-# 忽略所有webpack缓存文件
+# 明确忽略超大的webpack缓存文件
 .next/cache/**/*
 .next/cache/webpack/**/*
+.next/cache/webpack/client-production/**/*.pack
+.next/cache/webpack/client-production/**/*.pack.gz
+.next/cache/webpack/client-production/0.pack
+.next/cache/webpack/client-production/1.pack
+.next/cache/webpack/client-production/2.pack
+.next/cache/webpack/client-production/3.pack
+.next/cache/webpack/client-production/4.pack
+.next/cache/webpack/client-production/5.pack
+.next/cache/webpack/client-production/*.pack
+.next/cache/webpack/server-production/*.pack
 **/*.pack
 **/*.map
 **/*.pack.old

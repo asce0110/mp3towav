@@ -30,7 +30,7 @@ try {
 const r2AccountId = process.env.R2_ACCOUNT_ID || '';
 const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID || '';
 const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY || '';
-const r2BucketName = process.env.R2_BUCKET_NAME || '';
+export const r2BucketName = process.env.R2_BUCKET_NAME || '';
 const endpoint = `https://${r2AccountId}.r2.cloudflarestorage.com`;
 
 // 检查R2配置是否完整
@@ -41,27 +41,93 @@ export const isR2Configured = !!(
   r2BucketName
 );
 
-// 初始化S3客户端
-let r2Client: S3Client | null = null;
+// 为开发环境禁用SSL证书验证 (仅用于开发测试)
+if (process.env.NODE_ENV === 'development') {
+  // 不再全局设置NODE_TLS_REJECT_UNAUTHORIZED，这会导致安全问题
+  console.warn('[R2] 注意: 在开发环境中将对R2连接使用特殊配置');
+}
 
-if (isR2Configured) {
+// 初始化S3客户端
+let r2ClientInstance: S3Client | null = null;
+
+// 提供初始化R2客户端的函数
+export async function initR2Client(): Promise<S3Client | null> {
+  // 如果已经初始化，直接返回实例
+  if (r2ClientInstance) {
+    return r2ClientInstance;
+  }
+  
+  if (!isR2Configured) {
+    console.log('[R2] R2配置不完整，无法初始化客户端');
+    return null;
+  }
+  
   try {
-    r2Client = new S3Client({
+    // 为本地开发环境设置特殊配置选项
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    console.log(`[R2] 初始化客户端，当前环境: ${process.env.NODE_ENV}, 开发模式: ${isDevelopment}`);
+    
+    // 创建R2客户端配置
+    const clientConfig: any = {
       region: 'auto',
       endpoint,
       credentials: {
         accessKeyId: r2AccessKeyId,
         secretAccessKey: r2SecretAccessKey,
       },
-    });
-    console.log('R2客户端初始化成功');
+      forcePathStyle: true,
+    };
+
+    // 添加更可靠的网络配置
+    clientConfig.requestHandler = {
+      httpOptions: {
+        timeout: 60000, // 60秒超时
+        connectTimeout: 30000, // 30秒连接超时
+      }
+    };
+
+    // 仅在开发环境中添加日志记录器
+    if (isDevelopment) {
+      clientConfig.logger = {
+        debug: (...args: any[]) => console.debug('[R2 DEBUG]', ...args),
+        info: (...args: any[]) => console.info('[R2 INFO]', ...args),
+        warn: (...args: any[]) => console.warn('[R2 WARN]', ...args),
+        error: (...args: any[]) => console.error('[R2 ERROR]', ...args),
+      };
+    }
+    
+    // 创建R2客户端
+    r2ClientInstance = new S3Client(clientConfig);
+    console.log('[R2] R2客户端初始化成功');
+    return r2ClientInstance;
+  } catch (error) {
+    console.error('[R2] 初始化R2客户端失败:', error);
+    return null;
+  }
+}
+
+if (isR2Configured) {
+  try {
+    // 初始化客户端实例
+    initR2Client()
+      .then(client => {
+        r2ClientInstance = client;
+        console.log('R2客户端初始化成功');
+      })
+      .catch(error => {
+        console.error('初始化R2客户端失败:', error);
+        r2ClientInstance = null;
+      });
   } catch (error) {
     console.error('初始化R2客户端失败:', error);
-    r2Client = null;
+    r2ClientInstance = null;
   }
 } else {
   console.log('R2配置不完整，存储功能将回退到本地文件系统');
 }
+
+// 导出r2Client以供外部使用
+export const r2Client = r2ClientInstance;
 
 // 验证R2连接
 export async function validateR2Connection(): Promise<boolean> {
@@ -95,28 +161,50 @@ export async function uploadToR2(
   contentType = 'application/octet-stream'
 ): Promise<boolean> {
   if (!r2Client) {
-    console.error('[R2] 客户端未初始化，无法上传文件。检查环境变量配置');
-    // 输出当前环境变量状态（不显示实际值）
-    console.log('[R2] 环境变量状态:', {
-      R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
-      R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
-      R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
-      R2_BUCKET_NAME: !!process.env.R2_BUCKET_NAME
-    });
-    return false;
+    // 尝试重新初始化R2客户端
+    console.log('[R2] 客户端未初始化，尝试重新初始化...');
+    const newClient = await initR2Client();
+    if (!newClient) {
+      console.error('[R2] 重新初始化失败，无法上传文件。检查环境变量配置');
+      // 输出当前环境变量状态（不显示实际值）
+      console.log('[R2] 环境变量状态:', {
+        R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
+        R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
+        R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
+        R2_BUCKET_NAME: !!process.env.R2_BUCKET_NAME
+      });
+      return false;
+    }
   }
 
   console.log(`[R2] 准备上传文件: ${key}, 大小: ${fileBuffer.length} 字节, 类型: ${contentType}`);
   console.log(`[R2] 使用存储桶: ${r2BucketName}, 端点: ${endpoint}`);
   
   try {
-    // 添加时间戳元数据
-    const timestampedMetadata = {
-      ...metadata,
-      'upload-timestamp': Date.now().toString(),
-    };
+    // 添加时间戳元数据 - 确保所有元数据键名为有效的标识符
+    const sanitizedMetadata: Record<string, string> = {};
     
-    console.log(`[R2] 构建上传命令，包含元数据:`, Object.keys(timestampedMetadata));
+    // 处理所有元数据，确保键名和值都有效
+    for (const [key, value] of Object.entries(metadata)) {
+      // 移除连字符，替换为下划线，并移除任何非字母数字字符
+      const sanitizedKey = key.replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      
+      // 确保值也是有效的ASCII字符，如果有非ASCII字符，使用URL编码
+      let sanitizedValue = typeof value === 'string' ? value : String(value);
+      
+      // 检查值是否包含非ASCII字符
+      if (/[^\x00-\x7F]/.test(sanitizedValue)) {
+        console.log(`[R2] 元数据值包含非ASCII字符，进行URL编码: ${key}`);
+        sanitizedValue = encodeURIComponent(sanitizedValue);
+      }
+      
+      sanitizedMetadata[sanitizedKey] = sanitizedValue;
+    }
+    
+    // 添加时间戳
+    sanitizedMetadata['timestamp'] = Date.now().toString();
+    
+    console.log(`[R2] 构建上传命令，包含元数据:`, Object.keys(sanitizedMetadata));
     
     // 构建上传命令
     const command = new PutObjectCommand({
@@ -124,13 +212,22 @@ export async function uploadToR2(
       Key: key,
       Body: fileBuffer,
       ContentType: contentType,
-      Metadata: timestampedMetadata,
+      Metadata: sanitizedMetadata,
     });
 
     console.log(`[R2] 发送上传命令...`);
     
+    // 设置命令超时时间较长，以应对网络问题
+    const commandTimeout = 30000; // 30秒
+    
     // 发送上传命令
-    const result = await r2Client.send(command);
+    const result = await Promise.race([
+      r2Client.send(command),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('上传超时，可能存在网络问题')), commandTimeout);
+      })
+    ]) as any;
+    
     console.log(`[R2] 文件成功上传: ${key}, ETag: ${result.ETag}`);
     
     // 验证文件是否已上传
@@ -148,10 +245,17 @@ export async function uploadToR2(
     
     return true;
   } catch (error) {
-    console.error(`[R2] 上传文件失败: ${key}`, error);
+    console.error(`[R2] 上传文件失败: ${key}`);
     if (error instanceof Error) {
+      console.error(`[R2] 错误类型: ${error.constructor.name}`);
       console.error(`[R2] 错误详情: ${error.name}: ${error.message}`);
       console.error(`[R2] 错误堆栈: ${error.stack}`);
+      
+      // 检查是否为SSL握手错误
+      if (error.message.includes('SSL') || error.message.includes('handshake') || 
+          error.message.includes('EPROTO') || error.message.includes('ECONNRESET')) {
+        console.error('[R2] 检测到SSL/TLS握手错误，可能是由于网络问题或证书验证失败');
+      }
     }
     return false;
   }
@@ -267,7 +371,7 @@ export async function deleteFromR2(key: string): Promise<boolean> {
   }
 }
 
-// 列出R2中的对象
+// 列出R2对象
 export async function listR2Objects(prefix: string = '', limit: number = 100): Promise<Array<any>> {
   if (!r2Client) {
     console.error('R2客户端未初始化，无法列出对象');
@@ -275,7 +379,7 @@ export async function listR2Objects(prefix: string = '', limit: number = 100): P
   }
 
   try {
-    console.log(`列出R2对象, 前缀: ${prefix}, 限制: ${limit}`);
+    console.log(`列出R2对象，前缀: ${prefix}, 限制: ${limit}`);
     const command = new ListObjectsV2Command({
       Bucket: r2BucketName,
       Prefix: prefix,
@@ -283,16 +387,10 @@ export async function listR2Objects(prefix: string = '', limit: number = 100): P
     });
 
     const result = await r2Client.send(command);
-    const objects = result.Contents || [];
-    console.log(`找到${objects.length}个对象`);
-    
-    return objects.map(obj => ({
-      key: obj.Key,
-      size: obj.Size,
-      lastModified: obj.LastModified
-    }));
+    console.log(`列出R2对象成功，找到 ${result.Contents?.length || 0} 个对象`);
+    return result.Contents || [];
   } catch (error) {
-    console.error(`列出R2对象失败:`, error);
+    console.error('列出R2对象失败:', error);
     return [];
   }
 }
@@ -303,4 +401,12 @@ export async function setupR2Lifecycle(expireDays: number = 1): Promise<boolean>
   console.log(`请访问 https://dash.cloudflare.com/ 设置对象生命周期规则`);
   console.log(`建议为wav/和shares/目录设置 ${expireDays} 天的过期时间`);
   return false;
+}
+
+// 列出R2中的文件
+export async function listFilesInR2(prefix: string = '', limit: number = 100): Promise<string[]> {
+  return await listR2Objects(prefix, limit).then(objects => 
+    objects.map(obj => obj.Key || obj.key || '')
+      .filter(key => key !== '')
+  );
 } 

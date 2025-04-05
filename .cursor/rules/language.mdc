@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+不要修改任何 CSS 文件或组件样式，只关注语言切换的 JavaScript 逻辑。
+URL 结构：决定语言版本的 URL 格式（例如 /zh/、/de/）。默认英文（英文url不需要/en/,而是直接xxx.com/）。
+推荐使用国际化库，例如 React 项目用 react-i18next，简化多语言处理。
+步骤 1："帮我创建一个语言切换组件，让用户选择语言。"
+步骤 2："修改内容加载逻辑，根据选择的语言加载对应的 [例如 JSON 文件]。"
+步骤 3："确保用户选择的语言在页面切换时保持不变。"

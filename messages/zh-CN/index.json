@@ -1,0 +1,493 @@
+{
+  "app": {
+    "title": "MP3转WAV转换器 | 免费在线音频工具",
+    "description": "免费的MP3到WAV转换器。在线转换音频文件，可自定义采样率、位深度和音量设置。无需安装即可获得完美音质。"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "title": "MP3转WAV转换器",
+    "description": "一款将MP3音频文件转换为WAV格式的免费在线工具",
+    "waiting": "等待中...",
+    "processing": "处理中...",
+    "back": "返回",
+    "next": "下一步",
+    "continue": "继续",
+    "close": "关闭",
+    "submit": "提交",
+    "save": "保存",
+    "delete": "删除",
+    "download": "下载",
+    "share": "分享",
+    "reset": "重置",
+    "apply": "应用",
+    "preview": "预览",
+    "cancel": "取消",
+    "upload": "上传",
+    "confirm": "确认"
+  },
+  "converter": {
+    "title": "MP3转WAV转换器",
+    "subtitle": "免费在线音频转换器",
+    "description": "使用这个免费在线工具将MP3音频文件转换为WAV格式",
+    "uploadTitle": "上传MP3文件",
+    "uploadSubtitle": "将文件拖放到这里或点击浏览",
+    "startConversion": "转换为WAV",
+    "dropzone": {
+      "title": "将MP3文件拖放到这里",
+      "or": "或",
+      "browse": "浏览文件",
+      "description": "最大文件大小：100MB",
+      "subtitle": "或点击浏览",
+      "hint": "支持最大100MB的MP3文件",
+      "selected": "已选择文件"
+    },
+    "settings": {
+      "title": "转换设置",
+      "description": "配置转换的音频参数",
+      "sampleRate": {
+        "label": "采样率",
+        "description": "更高的采样率可捕获更多的音频细节"
+      },
+      "bitDepth": {
+        "label": "位深度",
+        "description": "更高的位深度提供更好的动态范围"
+      },
+      "channels": {
+        "label": "声道",
+        "description": "选择立体声或单声道输出",
+        "stereo": "立体声",
+        "mono": "单声道"
+      },
+      "volume": "音量",
+      "trim": "裁剪音频"
+    },
+    "buttons": {
+      "convert": "转换为WAV",
+      "download": "下载WAV",
+      "share": "分享",
+      "preview": "预览"
+    },
+    "status": {
+      "converting": "转换中...",
+      "uploadingFile": "上传文件中...",
+      "preparingDownload": "准备下载中...",
+      "readyToDownload": "准备好下载",
+      "conversionSuccess": "MP3成功转换为WAV！",
+      "conversionFailed": "转换失败。请重试。",
+      "filesWithMissingData": "个文件缺少数据"
+    },
+    "waveform": {
+      "dragHint": "拖动绿色和红色标记调整裁剪",
+      "playing": "播放中",
+      "paused": "已暂停",
+      "play": "播放",
+      "pause": "暂停"
+    },
+    "questions": {
+      "howToConvert": {
+        "question": "如何将MP3转换为WAV？",
+        "answer": "要将MP3转换为WAV，只需将MP3文件拖放到上传区域或点击浏览文件。然后点击\"转换为WAV\"按钮。转换完成后，您可以下载与原始文件同名但扩展名为.wav的WAV文件。整个过程只需几秒钟，直接在您的浏览器中完成。"
+      },
+      "storageTime": {
+        "question": "转换后的文件会存储多长时间？",
+        "answer": "您转换后的WAV文件会在我们的服务器上安全存储24小时。这给您足够的时间下载或分享文件。24小时后，文件会自动从我们的系统中删除以保护隐私并优化存储空间。我们建议您尽快下载转换后的文件，或使用分享链接功能确保不会失去对转换的访问权限。"
+      }
+    }
+  },
+  "history": {
+    "metaTitle": "MP3到WAV转换历史",
+    "title": "转换历史",
+    "actions": {
+      "refresh": "刷新",
+      "clear": "清除历史",
+      "download": "下载",
+      "share": "分享",
+      "sharing": "分享中...",
+      "delete": "删除"
+    },
+    "card": {
+      "title": "您的转换历史",
+      "description": "您最近的MP3到WAV转换。文件在创建后24小时自动过期。"
+    },
+    "empty": {
+      "title": "未找到历史记录",
+      "description": "转换MP3文件后，记录将显示在这里"
+    },
+    "table": {
+      "filename": "文件名",
+      "convertedAt": "转换时间",
+      "expiration": "过期时间",
+      "size": "大小",
+      "actions": "操作",
+      "storage": "存储位置"
+    },
+    "status": {
+      "active": "有效",
+      "expired": "已过期",
+      "expiresIn": "过期时间"
+    },
+    "storage": {
+      "local": "本地",
+      "cloud": "云端"
+    },
+    "share": {
+      "error": "分享错误",
+      "needR2": "文件需要先上传到云存储",
+      "uploadFailed": "上传文件到云存储失败",
+      "createFailed": "创建分享链接失败",
+      "unknownError": "分享过程中发生未知错误"
+    },
+    "dialogs": {
+      "deleteConfirm": {
+        "title": "删除转换",
+        "description": "您确定要从历史记录中删除此转换吗？",
+        "cancel": "取消",
+        "confirm": "删除"
+      },
+      "delete": {
+        "title": "删除记录",
+        "description": "您确定要删除此记录吗？"
+      }
+    },
+    "toast": {
+      "cleared": {
+        "title": "历史记录已清除",
+        "description": "所有历史记录已被删除"
+      },
+      "refreshed": {
+        "title": "历史记录已刷新",
+        "description": "过期的历史记录已被清理"
+      },
+      "download": {
+        "started": {
+          "title": "下载已开始",
+          "description": "您的文件正在准备下载"
+        }
+      }
+    },
+    "faq": {
+      "title": "关于历史的常见问题",
+      "storage": {
+        "question": "我的历史记录存储在哪里？",
+        "answer": "转换历史存储在您浏览器的本地存储中，不会上传到服务器。清除浏览器数据将删除这些记录。"
+      },
+      "disappear": {
+        "question": "为什么我的历史记录消失了？",
+        "answer": "为确保您的浏览器不会存储过多数据，转换记录在创建后24小时自动过期。您也可以随时手动清除历史记录。"
+      },
+      "download": {
+        "question": "如何下载已转换的文件？",
+        "answer": "在历史列表中，每个转换项的右侧都有一个下载按钮。点击它即可下载已转换的WAV文件。"
+      },
+      "delete": {
+        "question": "如何删除单个历史记录？",
+        "answer": "目前不支持删除单个历史记录。您可以使用\"清除历史\"按钮删除所有记录，或等待它们在24小时后自动过期。"
+      }
+    }
+  },
+  "faq": {
+    "title": "常见问题",
+    "description": "查找有关MP3转WAV转换的常见问题解答。",
+    "questions": {
+      "howToConvert": {
+        "question": "如何将MP3转换为WAV？",
+        "answer": "只需通过拖放将MP3文件上传到上传区域，或点击浏览您的文件。然后点击'转换为WAV'按钮。转换完成后，您可以下载WAV文件。"
+      },
+      "storageTime": {
+        "question": "我的文件存储多长时间？",
+        "answer": "您的原始MP3和转换后的WAV文件将在1小时后自动从我们的服务器删除。我们尊重您的隐私，不会将您的文件保留超过转换过程所需的时间。"
+      },
+      "bestSoftware": {
+        "question": "什么是最好的免费MP3转WAV软件？",
+        "answer": "对于在线转换，我们的免费MP3转WAV转换器提供高质量结果，无需安装。对于桌面使用，Audacity、VLC和FFmpeg等免费软件是具有额外音频编辑功能的极佳选择。"
+      },
+      "improveQuality": {
+        "question": "将MP3转换为WAV会提高音质吗？",
+        "answer": "将MP3转换为WAV不会提高原始音质。WAV是一种无损格式，会原样保留质量，但无法恢复初始MP3压缩过程中丢失的信息。然而，WAV更适合进一步编辑和处理。"
+      },
+      "fileSize": {
+        "question": "为什么WAV文件比MP3大很多？",
+        "answer": "WAV文件明显更大，因为它们是未压缩的，存储完整的音频数据而不丢失信息。MP3是一种压缩格式，通过移除某些音频数据来减小文件大小。WAV文件可能比其MP3等效文件大10倍，同时保留完整的音频质量。"
+      },
+      "losslessConversion": {
+        "question": "如何在不损失质量的情况下将MP3转换为WAV？",
+        "answer": "要在不额外损失质量的情况下转换，请使用我们的转换器并设置最高采样率和位深度。请记住，原始MP3质量已经是压缩的，WAV转换会保留现有质量，但无法恢复已经丢失的信息。"
+      },
+      "onlineVsOffline": {
+        "question": "在线转换MP3到WAV和使用桌面软件哪个更好？",
+        "answer": "像我们这样的在线转换器非常适合快速、方便的转换，无需安装。桌面软件可能提供更高级的功能和批量处理，但需要安装和设置。如果使用可靠的工具，转换质量是相当的。"
+      },
+      "windowsConversion": {
+        "question": "如何在Windows上将MP3转换为WAV而不需要额外软件？",
+        "answer": "Windows用户可以通过在任何浏览器中直接使用我们的在线转换器，而无需安装额外软件来转换MP3到WAV。如果您更喜欢使用内置工具，Windows Media Player也可以执行从MP3到WAV的简单转换。"
+      },
+      "bestSettings": {
+        "question": "MP3转WAV的最佳设置是什么？",
+        "answer": "为了获得最高质量，使用44.1kHz或48kHz采样率（与原始MP3匹配），16位或24位深度，并保持原始声道配置（立体声/单声道）。这些设置确保了大多数用途的最佳音频质量，同时保持文件可管理。"
+      },
+      "conversionTime": {
+        "question": "将MP3文件转换为WAV需要多长时间？",
+        "answer": "转换时间取决于文件大小和您的网络连接。大多数转换只需几秒钟即可完成。较大的文件（接近我们的100MB限制）可能需要稍长时间，但使用标准网络连接通常不到一分钟。"
+      }
+    }
+  },
+  "features": {
+    "title": "为什么选择我们的转换器",
+    "privacy": {
+      "title": "隐私优先",
+      "description": "您的文件会在1小时后自动删除。我们不会保留您的数据。"
+    },
+    "quality": {
+      "title": "高质量",
+      "description": "我们的转换器在转换过程中保持最高可能的音频质量。"
+    },
+    "speed": {
+      "title": "极速转换",
+      "description": "先进的算法确保即使是大文件也能快速转换。"
+    },
+    "settings": {
+      "title": "高级设置",
+      "description": "自定义采样率、位深度、声道等，获得完美的音频质量。"
+    },
+    "sharing": {
+      "title": "轻松分享",
+      "description": "为您转换的文件生成可分享的链接，方便快速分发。"
+    },
+    "storage": {
+      "title": "临时存储",
+      "description": "文件仅存储1小时，确保您的隐私和安全。"
+    }
+  },
+  "header": {
+    "home": "首页",
+    "language": "语言",
+    "history": "历史记录",
+    "theme": "主题",
+    "github": "GitHub",
+    "feedback": "反馈"
+  },
+  "footer": {
+    "copyright": "© 2024 MP3转WAV转换器。保留所有权利。",
+    "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款"
+  },
+  "meta": {
+    "title": "MP3转WAV转换器 - 免费在线音频转换工具",
+    "description": "在线将MP3文件转换为WAV格式。免费、快速、安全，无需注册。高质量音频转换工具。"
+  },
+  "home": {
+    "title": "MP3转WAV转换器",
+    "subtitle": "免费在线音频转换器",
+    "description": "几秒钟内将您的MP3音频文件转换为高质量WAV格式。无需注册，完全免费使用。"
+  },
+  "share": {
+    "title": "分享您的转换文件",
+    "description": "生成链接与他人分享您转换后的WAV文件",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制到剪贴板！",
+    "expiry": "链接24小时后过期",
+    "hours": "小时",
+    "minutes": "分钟",
+    "seconds": "秒",
+    "expired": "已过期",
+    "success": {
+      "title": "文件分享成功！",
+      "description": "您的音频文件已上传并准备好分享。链接将在24小时内有效。"
+    },
+    "file": {
+      "title": "分享的文件",
+      "download": "下载"
+    },
+    "link": {
+      "title": "分享链接",
+      "copy": "复制",
+      "copied": "已复制！"
+    },
+    "copied": {
+      "title": "链接已复制！",
+      "description": "分享链接已复制到剪贴板。",
+      "failed": "复制失败",
+      "error": "无法复制到剪贴板。"
+    },
+    "download": {
+      "failed": "下载失败",
+      "error": "无法下载文件。请重试。"
+    },
+    "access": {
+      "title": "访问分享的文件",
+      "pageTitle": "访问分享的文件",
+      "description": "输入分享ID以访问分享的音频文件。",
+      "placeholder": "输入分享ID...",
+      "button": "访问",
+      "hint": "您可以通过输入分享ID或使用完整链接来访问分享的文件。"
+    },
+    "notFound": {
+      "title": "分享未找到",
+      "description": "分享的文件不存在或已过期。",
+      "button": "返回首页"
+    },
+    "failed": "分享失败",
+    "error": "无法分享文件。请重试。",
+    "uploadWarning": "云上传失败",
+    "usingLocal": "使用本地文件代替。此链接仅在您当前设备上有效。"
+  },
+  "errors": {
+    "fileTooLarge": "文件太大。最大大小为100MB。",
+    "invalidFileType": "无效的文件类型。仅支持MP3文件。",
+    "conversionFailed": "转换失败。请重试。",
+    "uploadFailed": "上传失败。请检查您的连接并重试。",
+    "downloadFailed": "下载失败。请重试。",
+    "browserNotSupported": "您的浏览器不支持转换所需的某些功能。"
+  },
+  "usageGuide": {
+    "title": "如何将MP3转换为WAV",
+    "steps": {
+      "upload": {
+        "title": "上传MP3文件",
+        "description": "将MP3文件拖放到上传区域或点击浏览您的文件。"
+      },
+      "settings": {
+        "title": "调整设置（可选）",
+        "description": "根据需要自定义音量、采样率、声道、位深度并裁剪音频。"
+      },
+      "convert": {
+        "title": "转换为WAV",
+        "description": "点击转换按钮并等待转换过程完成。"
+      },
+      "download": {
+        "title": "下载或分享",
+        "description": "下载您转换后的WAV文件或与他人分享链接。"
+      }
+    }
+  },
+  "relatedArticles": {
+    "title": "相关文章",
+    "articles": {
+      "formats": {
+        "title": "MP3 vs WAV：了解音频格式",
+        "description": "探索MP3和WAV音频格式之间的主要区别，以及何时使用每种格式。",
+        "readMore": "阅读文章"
+      },
+      "sampleRates": {
+        "title": "音频制作的最佳采样率",
+        "description": "了解不同音频制作场景的理想采样率及其对质量的影响。",
+        "readMore": "阅读文章"
+      }
+    }
+  },
+  "otherTools": {
+    "title": "其他音频转换工具",
+    "tools": {
+      "wavToMp3": "WAV转MP3",
+      "mp3ToFlac": "MP3转FLAC",
+      "wavToOgg": "WAV转OGG",
+      "mp4ToMp3": "MP4转MP3",
+      "audioEditor": "音频编辑器",
+      "audioTrimmer": "音频裁剪器",
+      "audioNormalizer": "音频均衡器",
+      "moreTools": "更多工具"
+    }
+  },
+  "batch": {
+    "title": "批量转换",
+    "description": "同时转换多个MP3文件为WAV格式",
+    "upload": "上传MP3文件",
+    "maxFilesHint": "最多可以一次上传10个文件",
+    "convertAll": "全部转换",
+    "selectedFiles": "已选择 {{count}} 个文件",
+    "noFilesSelected": "未选择文件",
+    "downloadAll": "全部下载",
+    "status": {
+      "waiting": "等待中",
+      "converting": "转换中",
+      "completed": "已完成",
+      "failed": "失败"
+    }
+  },
+  "download": {
+    "title": "下载您的WAV文件",
+    "pageTitle": "下载转换后的WAV文件",
+    "pageDescription": "通过输入下载ID或URL访问您的MP3到WAV转换",
+    "accessDownloads": "访问下载",
+    "enterIdInstructions": "输入您的下载ID或粘贴下载URL",
+    "idPlaceholder": "输入下载ID（例如：m8rfqnpuprcwaox）",
+    "goButton": "前往",
+    "extractIdFromUrl": "从URL提取ID",
+    "downloadExpiration": "下载链接在转换后24小时内有效",
+    "readyToDownload": "您的文件已准备好下载",
+    "downloadNow": "立即下载",
+    "downloadAgain": "再次下载",
+    "share": {
+      "title": "分享",
+      "text": "看看我转换的WAV文件！",
+      "copied": {
+        "title": "链接已复制",
+        "description": "分享链接已复制到剪贴板！"
+      },
+      "error": {
+        "title": "分享错误",
+        "description": "分享此文件时出现问题。"
+      }
+    },
+    "viewInBrowser": "在浏览器中查看",
+    "expiresIn": "过期时间",
+    "expired": "已过期",
+    "hours": "小时",
+    "minutes": "分钟",
+    "whatNext": "接下来做什么？",
+    "convertMore": "想要转换更多文件吗？",
+    "backToHome": "返回首页",
+    "loading": "准备您的下载",
+    "fileNotFound": "找不到请求的文件",
+    "success": {
+      "title": "下载已开始",
+      "description": "您的文件已开始下载。如果没有自动开始，请再次点击下载按钮。"
+    },
+    "error": {
+      "title": "下载错误",
+      "description": "下载时出现问题。请重试。",
+      "emptyId": {
+        "title": "未提供ID",
+        "description": "请输入下载ID或URL。"
+      },
+      "invalidId": {
+        "title": "无效的下载ID",
+        "description": "下载ID格式不正确。"
+      },
+      "invalidUrl": {
+        "title": "无效的URL",
+        "description": "无法从此URL提取有效的下载ID。"
+      }
+    },
+    "notFound": {
+      "title": "文件未找到",
+      "description": "您要查找的文件不存在或已过期。"
+    },
+    "faq": {
+      "title": "常见问题",
+      "whereIsId": {
+        "question": "我在哪里可以找到下载ID？",
+        "answer": "在转换MP3文件后，下载ID会在转换结果页面上提供。它也包含在下载URL和您创建的任何分享链接中。"
+      },
+      "howLongAvailable": {
+        "question": "我的转换文件可以使用多长时间？",
+        "answer": "您的转换文件在转换后24小时内可用。在此期间后，它们会自动从我们的服务器中删除。"
+      },
+      "convertAnother": {
+        "question": "我可以转换另一个文件吗？",
+        "answer": "是的！您可以转换所需数量的文件。只需返回首页开始新的转换即可。",
+        "link": "转换另一个文件"
+      },
+      "fileSize": {
+        "question": "有文件大小限制吗？",
+        "answer": "是的，MP3文件的最大转换文件大小为100MB。此限制确保最佳性能和快速转换时间。"
+      },
+      "sharing": {
+        "question": "我可以与他人分享我的转换文件吗？",
+        "answer": "是的！转换文件后，您可以创建一个分享链接，其他人可以使用该链接下载您转换的WAV文件。这些分享链接有效期为24小时。"
+      }
+    }
+  }
+} 

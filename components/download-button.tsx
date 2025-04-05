@@ -65,7 +65,7 @@ export function DownloadButton({
 
   return (
     <Button 
-      className="w-full" 
+      className="w-full bg-[#2A6FDB] hover:bg-[#2A6FDB]/90 text-white" 
       size="lg" 
       onClick={handleDownload}
       disabled={isDownloading}

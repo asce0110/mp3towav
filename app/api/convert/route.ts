@@ -451,7 +451,7 @@ const saveAndReturnResult = async (outputBuffer: Buffer, fileId: string, origina
   let r2Success = false;
   if (isR2Configured) {
     try {
-      const r2Key = `wav/${fileId}.wav`;
+      const r2Key = `wav/mp3_to_wav_${fileId}.wav`;
       console.log(`[API:convert] 开始上传WAV文件到R2: fileId=${fileId}, 文件路径=${r2Key}, 大小=${outputBuffer.length} 字节`);
       
       // 上传到wav/目录
@@ -770,7 +770,7 @@ export async function POST(request: NextRequest) {
     
     if (isR2Configured && !skipR2Upload) {
       try {
-        const key = `wav/${fileId}.wav`;
+        const key = `wav/mp3_to_wav_${fileId}.wav`;
         r2Success = await uploadToR2(key, outputBuffer);
         
         if (r2Success) {
@@ -851,7 +851,7 @@ export async function GET(request: NextRequest) {
   let r2FileExists = false;
   if (isR2Configured && (storageType === 'any' || storageType === 'r2')) {
     try {
-      const r2FileKey = `wav/${fileId}.wav`;
+      const r2FileKey = `wav/mp3_to_wav_${fileId}.wav`;
       console.log(`检查文件是否存在于R2: ${r2FileKey}`);
       r2FileExists = await fileExistsInR2(r2FileKey);
       console.log(`[API:convert:${requestId}] 文件在R2中存在: ${r2FileExists}`);
@@ -900,7 +900,7 @@ export async function GET(request: NextRequest) {
       }
       
       // 从R2下载文件
-      const fileBuffer = await downloadFromR2(`wav/${fileId}.wav`);
+      const fileBuffer = await downloadFromR2(`wav/mp3_to_wav_${fileId}.wav`);
       
       if (fileBuffer) {
         // 将文件保存到本地
@@ -936,7 +936,7 @@ export async function GET(request: NextRequest) {
       // 读取文件并上传到R2
       const fileBuffer = fs.readFileSync(localPath);
       const uploadSuccess = await uploadToR2(
-        `wav/${fileId}.wav`,
+        `wav/mp3_to_wav_${fileId}.wav`,
         fileBuffer,
         {
           'source': 'upload-request',
@@ -988,7 +988,7 @@ export async function GET(request: NextRequest) {
       // 读取文件并上传到R2
       const fileBuffer = fs.readFileSync(localPath);
       const uploadSuccess = await uploadToR2(
-        `wav/${fileId}.wav`,
+        `wav/mp3_to_wav_${fileId}.wav`,
         fileBuffer,
         {
           'source': 'local-file',

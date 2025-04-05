@@ -1,0 +1,64 @@
+import React, { useRef } from 'react'
+import { cn } from '../lib/utils'
+
+const AudioWaveform: React.FC<{
+  isPlaying: boolean;
+  currentTime: number;
+  audioDuration: number;
+  width: number;
+  height: number;
+  handleMouseMove: (event: React.MouseEvent<HTMLCanvasElement>) => void;
+  stopDragging: () => void;
+  handleWaveformClick: (event: React.MouseEvent<HTMLCanvasElement>) => void;
+  disabled: boolean;
+  containerRef: React.RefObject<HTMLDivElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+}> = ({
+  isPlaying,
+  currentTime,
+  audioDuration,
+  width,
+  height,
+  handleMouseMove,
+  stopDragging,
+  handleWaveformClick,
+  disabled,
+  containerRef,
+  canvasRef
+}) => {
+  return (
+    <div 
+      ref={containerRef} 
+      className={cn(
+        "relative h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden",
+        disabled && "opacity-60 cursor-not-allowed"
+      )}
+      onMouseMove={handleMouseMove}
+      onMouseUp={stopDragging}
+      onMouseLeave={stopDragging}
+    >
+      <canvas 
+        ref={canvasRef} 
+        className="w-full h-full cursor-pointer"
+        onClick={handleWaveformClick}
+        style={{ position: "relative", zIndex: 30 }}
+      />
+      {/* 绘制播放指示器 */}
+      {isPlaying && (
+        <div
+          style={{
+            position: 'absolute',
+            left: (currentTime / audioDuration) * width,
+            top: 0,
+            width: 6,
+            height: height,
+            backgroundColor: '#EF4444',
+            zIndex: 31
+          }}
+        ></div>
+      )}
+    </div>
+  )
+}
+
+export default AudioWaveform 
