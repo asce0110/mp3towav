@@ -17,4 +17,4 @@ Disallow: /batch-upload/*/
 Disallow: /*/batch-upload/*/
 
 # 站点地图链接
-Sitemap: https://mp3towav.vercel.app/sitemap.xml 
+Sitemap: https://mp3towav.net/sitemap.xml 

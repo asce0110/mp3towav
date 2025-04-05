@@ -15,7 +15,7 @@ export async function generateMetadata(props: {
     return {
       title: 'MP3 to WAV Batch Processor | Convert Multiple Files',
       description: 'Convert multiple MP3 files to WAV format at once with our batch processing tool. Save time and process audio files in bulk.',
-      metadataBase: new URL('https://mp3towav.vercel.app'),
+      metadataBase: new URL('https://mp3towav.net'),
       alternates: {
         canonical: '/batch-process'
       }
@@ -25,7 +25,7 @@ export async function generateMetadata(props: {
   return {
     title: 'MP3 to WAV Batch Processor | Convert Multiple Files',
     description: 'Convert multiple MP3 files to WAV format at once with our batch processing tool. Save time and process audio files in bulk.',
-    metadataBase: new URL('https://mp3towav.vercel.app'),
+    metadataBase: new URL('https://mp3towav.net'),
     alternates: {
       canonical: locale === defaultLocale ? '/batch-process' : `/${locale}/batch-process`
     }

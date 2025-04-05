@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next'
 import { locales, defaultLocale } from '@/lib/i18n.config'
 
 // 站点URL
-const baseUrl = 'https://mp3towav.vercel.app'
+const baseUrl = 'https://mp3towav.net'
 
 // 主要页面路径（只包含静态页面）
 const routes = [

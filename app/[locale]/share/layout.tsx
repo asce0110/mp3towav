@@ -15,7 +15,7 @@ export async function generateMetadata(props: {
     return {
       title: 'MP3 to WAV Share | Access Shared Audio Files',
       description: 'Access and share WAV audio files converted from MP3 format. Easy file sharing with our online converter.',
-      metadataBase: new URL('https://mp3towav.vercel.app'),
+      metadataBase: new URL('https://mp3towav.net'),
       alternates: {
         canonical: '/share'
       }
@@ -25,7 +25,7 @@ export async function generateMetadata(props: {
   return {
     title: 'MP3 to WAV Share | Access Shared Audio Files',
     description: 'Access and share WAV audio files converted from MP3 format. Easy file sharing with our online converter.',
-    metadataBase: new URL('https://mp3towav.vercel.app'),
+    metadataBase: new URL('https://mp3towav.net'),
     alternates: {
       canonical: locale === defaultLocale ? '/share' : `/${locale}/share`
     }
