@@ -1,0 +1,10 @@
+# 允许所有爬虫访问所有内容
+User-agent: *
+Allow: /
+
+# 禁止爬虫访问特定目录
+Disallow: /api/
+Disallow: /_next/
+
+# 站点地图链接
+Sitemap: https://mp3towav.vercel.app/sitemap.xml 
