@@ -1,127 +1,104 @@
-# MP3 to WAV Converter
+# MP3 to WAV Converter - Free Online Audio Conversion
 
+[![Visit Website](https://img.shields.io/badge/Visit-mp3towav.net-blue.svg)](https://mp3towav.net)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Made with Node.js](https://img.shields.io/badge/Node.js-14.x-green.svg)](https://nodejs.org)
+[![Made with Next.js](https://img.shields.io/badge/Next.js-15.x-black.svg)](https://nextjs.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-> An efficient and user-friendly tool for converting MP3 audio files to WAV format with high-quality output.
+> 🎵 **[MP3toWAV.net](https://mp3towav.net)** - The most advanced free online MP3 to WAV converter with high-quality lossless conversion, batch processing, and customizable audio settings.
 
-## 🎵 Features
+## 🚀 Features
 
-- **Simple Conversion**: Convert MP3 files to WAV format with just a few clicks
-- **Batch Processing**: Convert multiple files at once
-- **High Quality**: Maintain audio quality during conversion
-- **Cross-Platform**: Works on Windows, macOS, and Linux
-- **Lightweight**: Minimal system requirements
+- **🌐 [Free Online Access](https://mp3towav.net)**: No installation needed, works directly in your browser
+- **🔊 High-Quality Conversion**: Maintain the highest audio fidelity during MP3 to WAV conversion
+- **📦 Batch Processing**: Convert multiple MP3 files to WAV format simultaneously
+- **⚙️ Advanced Settings**: Customize sample rate, bit depth, and volume during conversion
+- **🔒 Privacy Focused**: Files processed locally in your browser - nothing uploaded to our servers
+- **🌍 Multi-language Support**: Available in 8+ languages including English, Chinese, Spanish, and more
+- **📱 Mobile Friendly**: Responsive design works on all devices
+- **⚡ Lightning Fast**: Optimized conversion engine for quick processing
+- **💾 Simple File Sharing**: Share converted WAV files with friends or across devices
 
-## 📋 Requirements
+## 🔗 Quick Links
 
-- Node.js 14.x or higher
-- pnpm (for package management)
+- **[Official Website](https://mp3towav.net)**: Visit our free online MP3 to WAV converter
+- **[Batch Processing](https://mp3towav.net/batch-process)**: Convert multiple files at once
+- **[File Sharing](https://mp3towav.net/share)**: Access our file sharing features
 
-## 🚀 Installation
+## 🤔 Why Convert MP3 to WAV?
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/asce0110/mp3towav.git
-   cd mp3towav
-   ```
+WAV files offer **lossless audio quality** that's essential for:
+- Professional audio editing and production
+- Archiving music in the highest quality format
+- Audio analysis and processing
+- Compatibility with professional audio equipment
+- Avoiding quality loss in further editing
 
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+## 💻 Technical Information
 
-## 💻 Usage
+This project is built with modern web technologies:
 
-### Command Line Interface
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Audio Processing**: Web Audio API, AudioContext
+- **Backend**: Node.js, Cloudflare R2 Storage
+- **Infrastructure**: Vercel for hosting
 
-Convert a single file:
-```bash
-pnpm start --input="path/to/audio.mp3" --output="path/to/output.wav"
-```
+## 🌟 What Makes MP3toWAV.net Special?
 
-Convert multiple files:
-```bash
-pnpm start --input="path/to/directory" --output="path/to/output/directory"
-```
-
-### Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--input`, `-i` | Input MP3 file or directory | - |
-| `--output`, `-o` | Output WAV file or directory | Same as input with .wav extension |
-| `--quality`, `-q` | Output quality (1-10) | 5 |
-| `--verbose`, `-v` | Show detailed conversion information | false |
-
-## 📚 API Documentation
-
-If you want to use this tool programmatically:
-
-```javascript
-const { convertToWav } = require('mp3towav');
-
-// Convert a single file
-convertToWav('input.mp3', 'output.wav', { quality: 8 })
-  .then(() => console.log('Conversion complete!'))
-  .catch(error => console.error('Conversion failed:', error));
-```
+- **Zero Installation**: No software to download - works entirely in your browser
+- **No File Size Limits**: Convert large MP3 files without restrictions
+- **Cross-Platform**: Works on Windows, macOS, Linux, iOS, and Android
+- **No Watermarks**: Clean, professional WAV files without any added watermarks
+- **Metadata Preservation**: Maintains audio metadata when possible
 
 ## 🤝 Contributing
 
-Contributions, issues and feature requests are welcome! Feel free to check [issues page](https://github.com/asce0110/mp3towav/issues).
+Contributions, issues and feature requests are welcome! Feel free to check our [issues page](https://github.com/asce0110/mp3towav/issues).
 
 ## 📝 License
 
 This project is [MIT](LICENSE) licensed.
 
-## 🙏 Acknowledgements
+## 🧹 Storage Management
 
-- [FFMPEG](https://ffmpeg.org/) for the underlying audio conversion
-- [Node.js](https://nodejs.org/) for the runtime environment
-- All contributors who have helped this project
+For R2 storage management, we provide two cleaning solutions:
 
-## R2存储清理
+### Option 1: Node.js script (for local/server execution)
 
-为确保R2存储不会累积过多未使用文件，项目提供了两种清理方案：
-
-### 方案1：Node.js脚本（适合本地/服务器运行）
-
-可以通过cron任务定期运行Node.js脚本清理过期文件：
+Set up cron jobs to periodically clean expired files:
 
 ```bash
-# 每小时运行一次
+# Run hourly
 0 * * * * node /path/to/scripts/cleanup-r2.js >> /path/to/logs/r2-cleanup.log 2>&1
 ```
 
-脚本位置：`scripts/cleanup-r2.js`
+Script location: `scripts/cleanup-r2.js`
 
-### 方案2：Cloudflare Worker（推荐）
+### Option 2: Cloudflare Worker (recommended)
 
-使用Cloudflare Worker定时清理R2存储桶：
+Use Cloudflare Workers to automatically clean R2 storage:
 
-1. 安装Wrangler CLI：
+1. Install Wrangler CLI:
    ```bash
    pnpm install -g wrangler
    ```
 
-2. 登录Cloudflare账户：
+2. Log in to Cloudflare:
    ```bash
    wrangler login
    ```
 
-3. 部署Worker：
+3. Deploy Worker:
    ```bash
    cd scripts
    wrangler publish
    ```
 
-配置文件位置：`scripts/wrangler.toml`
-Worker代码：`scripts/r2-cleaner-worker.js`
+Configuration: `scripts/wrangler.toml`
+Worker code: `scripts/r2-cleaner-worker.js`
 
-此Worker会每6小时自动清理一次超过24小时的文件。
+This worker automatically cleans files older than 24 hours every 6 hours.
 
 ---
 
-Made with ❤️ by [Asce](https://github.com/asce0110) 
+🌟 **[Visit MP3toWAV.net](https://mp3towav.net)** - The ultimate free MP3 to WAV converter online! 
