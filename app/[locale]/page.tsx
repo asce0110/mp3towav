@@ -1,11 +1,6 @@
-import dynamic from 'next/dynamic'
+import { DynamicHomeClient } from './client-wrapper'
 
-// 使用动态导入延迟加载客户端组件，防止服务器预渲染时出现问题
-const HomeClient = dynamic(() => import('./home-client').then(mod => mod.HomeClient), {
-  ssr: false, // 关闭服务器端渲染
-})
-
-// 纯服务器组件
+// 服务器组件直接导入并使用客户端包装的组件
 export default function LocalizedHome() {
-  return <HomeClient />
+  return <DynamicHomeClient />
 } 
