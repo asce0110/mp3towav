@@ -14,7 +14,6 @@ import {
 } from '@/lib/r2';
 import { convertMp3ToWav } from '@/lib/ffmpeg';
 import { auth } from '@/auth';
-import { authConfig } from '@/lib/auth';
 
 let ffmpegAvailable = false;
 
@@ -663,7 +662,8 @@ function generateFileId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
 }
 
-// 处理POST请求 - 上传和转换文件
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -678,18 +678,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    // 检查文件大小
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: `File size exceeds limit of ${MAX_FILE_SIZE / 1024 / 1024}MB` },
+        { status: 400 }
+      );
+    }
+
+    // 检查文件类型
+    if (!file.type.startsWith('audio/')) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only audio files are allowed.' },
+        { status: 400 }
+      );
+    }
+
     // Generate unique file names
     const fileId = uuidv4();
     const mp3Key = `uploads/${fileId}.mp3`;
     const wavKey = `converted/${fileId}.wav`;
 
-    // Upload MP3 file
-    try {
-      await uploadToR2(file, mp3Key, file.type);
-    } catch (error) {
-      console.error('Error uploading MP3 file:', error);
+    // Upload MP3 file with retry
+    let uploadSuccess = false;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await uploadToR2(file, mp3Key, file.type);
+        uploadSuccess = true;
+        break;
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`Upload attempt ${attempt} failed:`, error);
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+
+    if (!uploadSuccess) {
       return NextResponse.json(
-        { error: 'Failed to upload MP3 file' },
+        { error: 'Failed to upload file after multiple attempts', details: lastError?.message },
         { status: 500 }
       );
     }
@@ -700,16 +730,20 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error converting file:', error);
       return NextResponse.json(
-        { error: 'Failed to convert file' },
+        { error: 'Failed to convert file', details: (error as Error).message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ fileId });
+    return NextResponse.json({ 
+      success: true,
+      fileId,
+      message: 'File uploaded and converted successfully'
+    });
   } catch (error) {
     console.error('Error in convert route:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }
