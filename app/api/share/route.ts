@@ -9,6 +9,7 @@ import {
   uploadToR2,
   downloadFromR2
 } from '@/lib/r2';
+import { MAX_FILE_SIZE } from '@/lib/constants';
 
 // 定义共享文件的数据结构
 interface ShareInfo {
@@ -177,10 +178,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 检查文件大小
-    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File size exceeds the maximum limit of 100MB' },
+        { error: `File size exceeds the maximum limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB` },
         { status: 413 }
       );
     }

@@ -12,6 +12,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import path from 'path';
 import fs from 'fs';
+import { CHUNK_SIZE } from './constants';
 
 // 动态加载dotenv配置文件
 try {
@@ -156,217 +157,79 @@ export async function validateR2Connection(): Promise<boolean> {
   }
 }
 
-// 分片上传到R2
-async function uploadToR2InChunks(
-  key: string,
-  fileBuffer: Buffer,
-  metadata: Record<string, string> = {},
-  contentType = 'application/octet-stream'
-): Promise<boolean> {
-  if (!r2Client) {
-    console.warn('R2 未配置，无法上传文件:', key);
-    return false;
-  }
-
-  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-  const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE);
-  
-  console.log(`[R2] 开始分片上传: ${key}, 总大小: ${fileBuffer.length} 字节, 分片数: ${totalChunks}`);
-
+// 分块上传函数
+async function uploadToR2InChunks(key: string, buffer: Buffer, metadata: Record<string, string>) {
   try {
-    // 创建分片上传
-    const createMultipartUploadCommand = new CreateMultipartUploadCommand({
-      Bucket: r2BucketName,
+    // 创建分块上传
+    const createMultipartUpload = new CreateMultipartUploadCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
       Key: key,
-      ContentType: contentType,
-      Metadata: {
-        ...metadata,
-        'created-at': new Date().toISOString(),
-        'expires-at': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        'content-length': fileBuffer.length.toString(),
-      }
-    });
+      Metadata: metadata,
+    })
+    const { UploadId } = await r2Client!.send(createMultipartUpload)
 
-    const createResponse = await r2Client.send(createMultipartUploadCommand);
-    const uploadId = createResponse.UploadId;
+    // 计算分块数量
+    const totalChunks = Math.ceil(buffer.length / CHUNK_SIZE)
+    const parts = []
 
-    if (!uploadId) {
-      throw new Error('Failed to create multipart upload');
-    }
+    // 上传每个分块
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, buffer.length)
+      const chunk = buffer.slice(start, end)
 
-    // 上传所有分片
-    const uploadParts: CompletedPart[] = [];
-    for (let partNumber = 1; partNumber <= totalChunks; partNumber++) {
-      const start = (partNumber - 1) * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, fileBuffer.length);
-      const chunk = fileBuffer.slice(start, end);
-
-      const uploadPartCommand = new UploadPartCommand({
-        Bucket: r2BucketName,
+      const uploadPart = new UploadPartCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
         Key: key,
-        UploadId: uploadId,
-        PartNumber: partNumber,
-        Body: chunk
-      });
-
-      const uploadPartResponse = await r2Client.send(uploadPartCommand);
-      uploadParts.push({
-        PartNumber: partNumber,
-        ETag: uploadPartResponse.ETag
-      });
-
-      console.log(`[R2] 上传分片 ${partNumber}/${totalChunks} 完成`);
-    }
-
-    // 完成分片上传
-    const completeMultipartUploadCommand = new CompleteMultipartUploadCommand({
-      Bucket: r2BucketName,
-      Key: key,
-      UploadId: uploadId,
-      MultipartUpload: {
-        Parts: uploadParts
-      }
-    });
-
-    await r2Client.send(completeMultipartUploadCommand);
-    console.log(`[R2] 分片上传完成: ${key}`);
-
-    // 验证文件是否已上传
-    const exists = await fileExistsInR2(key);
-    if (exists) {
-      console.log(`[R2] 文件验证成功: ${key}`);
-      return true;
-    } else {
-      console.warn(`[R2] 文件验证失败，可能上传不完整: ${key}`);
-      return false;
-    }
-  } catch (error) {
-    console.error(`[R2] 分片上传失败: ${key}`, error);
-    return false;
-  }
-}
-
-// 修改原有的uploadToR2函数
-export async function uploadToR2(
-  key: string,
-  fileBuffer: Buffer,
-  metadata: Record<string, string> = {},
-  contentType = 'application/octet-stream'
-): Promise<boolean> {
-  // 如果文件小于5MB，使用普通上传
-  if (fileBuffer.length <= 5 * 1024 * 1024) {
-    return uploadToR2Direct(key, fileBuffer, metadata, contentType);
-  }
-  
-  // 大于5MB的文件使用分片上传
-  return uploadToR2InChunks(key, fileBuffer, metadata, contentType);
-}
-
-// 原有的直接上传函数重命名为uploadToR2Direct
-async function uploadToR2Direct(
-  key: string,
-  fileBuffer: Buffer,
-  metadata: Record<string, string> = {},
-  contentType = 'application/octet-stream'
-): Promise<boolean> {
-  if (!r2Client) {
-    // 尝试重新初始化R2客户端
-    console.log('[R2] 客户端未初始化，尝试重新初始化...');
-    const newClient = await initR2Client();
-    if (!newClient) {
-      console.error('[R2] 重新初始化失败，无法上传文件。检查环境变量配置');
-      // 输出当前环境变量状态（不显示实际值）
-      console.log('[R2] 环境变量状态:', {
-        R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
-        R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
-        R2_SECRET_ACCESS_KEY: !!process.env.R2_SECRET_ACCESS_KEY,
-        R2_BUCKET_NAME: !!process.env.R2_BUCKET_NAME
-      });
-      return false;
-    }
-  }
-
-  console.log(`[R2] 准备上传文件: ${key}, 大小: ${fileBuffer.length} 字节, 类型: ${contentType}`);
-  console.log(`[R2] 使用存储桶: ${r2BucketName}, 端点: ${endpoint}`);
-  
-  try {
-    // 添加时间戳元数据 - 确保所有元数据键名为有效的标识符
-    const sanitizedMetadata: Record<string, string> = {};
-    
-    // 处理所有元数据，确保键名和值都有效
-    for (const [key, value] of Object.entries(metadata)) {
-      // 移除连字符，替换为下划线，并移除任何非字母数字字符
-      const sanitizedKey = key.replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-      
-      // 确保值也是有效的ASCII字符，如果有非ASCII字符，使用URL编码
-      let sanitizedValue = typeof value === 'string' ? value : String(value);
-      
-      // 检查值是否包含非ASCII字符
-      if (/[^\x00-\x7F]/.test(sanitizedValue)) {
-        console.log(`[R2] 元数据值包含非ASCII字符，进行URL编码: ${key}`);
-        sanitizedValue = encodeURIComponent(sanitizedValue);
-      }
-      
-      sanitizedMetadata[sanitizedKey] = sanitizedValue;
-    }
-    
-    // 添加时间戳
-    sanitizedMetadata['timestamp'] = Date.now().toString();
-    
-    console.log(`[R2] 构建上传命令，包含元数据:`, Object.keys(sanitizedMetadata));
-    
-    // 构建上传命令
-    const command = new PutObjectCommand({
-      Bucket: r2BucketName,
-      Key: key,
-      Body: fileBuffer,
-      ContentType: contentType,
-      Metadata: sanitizedMetadata,
-    });
-
-    console.log(`[R2] 发送上传命令...`);
-    
-    // 设置命令超时时间较长，以应对网络问题
-    const commandTimeout = 30000; // 30秒
-    
-    // 发送上传命令
-    const result = await Promise.race([
-      r2Client.send(command),
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('上传超时，可能存在网络问题')), commandTimeout);
+        UploadId,
+        PartNumber: i + 1,
+        Body: chunk,
       })
-    ]) as any;
-    
-    console.log(`[R2] 文件成功上传: ${key}, ETag: ${result.ETag}`);
-    
-    // 验证文件是否已上传
-    try {
-      console.log(`[R2] 验证文件是否已上传: ${key}`);
-      const exists = await fileExistsInR2(key);
-      if (exists) {
-        console.log(`[R2] 文件验证成功: ${key}`);
-      } else {
-        console.warn(`[R2] 文件验证失败，可能上传不完整: ${key}`);
-      }
-    } catch (verifyError) {
-      console.error(`[R2] 文件验证出错: ${key}`, verifyError);
+
+      const { ETag } = await r2Client!.send(uploadPart)
+      parts.push({ PartNumber: i + 1, ETag })
     }
-    
-    return true;
+
+    // 完成分块上传
+    const completeMultipartUpload = new CompleteMultipartUploadCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      UploadId,
+      MultipartUpload: { Parts: parts },
+    })
+
+    await r2Client!.send(completeMultipartUpload)
+    return true
   } catch (error) {
-    console.error(`[R2] 上传文件失败: ${key}`);
-    if (error instanceof Error) {
-      console.error(`[R2] 错误类型: ${error.constructor.name}`);
-      console.error(`[R2] 错误详情: ${error.name}: ${error.message}`);
-      console.error(`[R2] 错误堆栈: ${error.stack}`);
-      
-      // 检查是否为SSL握手错误
-      if (error.message.includes('SSL') || error.message.includes('handshake') || 
-          error.message.includes('EPROTO') || error.message.includes('ECONNRESET')) {
-        console.error('[R2] 检测到SSL/TLS握手错误，可能是由于网络问题或证书验证失败');
-      }
-    }
-    return false;
+    console.error('Error in multipart upload:', error)
+    return false
+  }
+}
+
+// 直接上传函数
+async function uploadToR2Direct(key: string, buffer: Buffer, metadata: Record<string, string>) {
+  try {
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      Metadata: metadata,
+    })
+    await r2Client!.send(command)
+    return true
+  } catch (error) {
+    console.error('Error in direct upload:', error)
+    return false
+  }
+}
+
+// 主上传函数
+export async function uploadToR2(key: string, buffer: Buffer, metadata: Record<string, string>) {
+  // 根据文件大小选择上传方式
+  if (buffer.length > CHUNK_SIZE) {
+    return uploadToR2InChunks(key, buffer, metadata)
+  } else {
+    return uploadToR2Direct(key, buffer, metadata)
   }
 }
 

@@ -4,6 +4,14 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "functions": {
+    "app/api/convert/route.ts": {
+      "maxDuration": 60,
+      "memory": 3008
+    },
+    "app/api/share/route.ts": {
+      "maxDuration": 60,
+      "memory": 3008
+    },
     "app/api/upload-client-wav/route.js": {
       "maxDuration": 60,
       "memory": 1024
@@ -34,7 +42,7 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Accept, X-Request-ID"
+          "value": "Content-Type, Authorization"
         }
       ]
     }
