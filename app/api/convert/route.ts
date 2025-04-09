@@ -13,8 +13,8 @@ import {
   validateR2Connection
 } from '@/lib/r2';
 import { convertMp3ToWav } from '@/lib/ffmpeg';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/auth';
+import { authConfig } from '@/lib/auth';
 
 let ffmpegAvailable = false;
 
@@ -666,7 +666,7 @@ function generateFileId(): string {
 // 处理POST请求 - 上传和转换文件
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

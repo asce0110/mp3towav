@@ -1,9 +1,9 @@
-import { NextAuthOptions } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
+import { NextAuthConfig } from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
 
-export const authOptions: NextAuthOptions = {
+export const authConfig = {
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: 'Credentials',
       credentials: {
         username: { label: "Username", type: "text" },
@@ -38,9 +38,9 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
+        (session.user as any).id = token.id;
       }
       return session;
     }
   }
-}; 
+} satisfies NextAuthConfig; 
