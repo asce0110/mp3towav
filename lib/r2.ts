@@ -1,18 +1,6 @@
-import { S3Client } from '@aws-sdk/client-s3';
-import { 
-  PutObjectCommand, 
-  GetObjectCommand, 
-  DeleteObjectCommand,
-  ListObjectsV2Command,
-  HeadObjectCommand,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import path from 'path';
-import fs from 'fs';
-import { CHUNK_SIZE } from './constants';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { CHUNK_SIZE } from './constants'
 
 // 动态加载dotenv配置文件
 try {
@@ -166,7 +154,7 @@ async function uploadToR2InChunks(key: string, buffer: Buffer, metadata: Record<
       Key: key,
       Metadata: metadata,
     })
-    const { UploadId } = await r2Client!.send(createMultipartUpload)
+    const { UploadId } = await r2Client.send(createMultipartUpload)
 
     // 计算分块数量
     const totalChunks = Math.ceil(buffer.length / CHUNK_SIZE)
@@ -186,7 +174,7 @@ async function uploadToR2InChunks(key: string, buffer: Buffer, metadata: Record<
         Body: chunk,
       })
 
-      const { ETag } = await r2Client!.send(uploadPart)
+      const { ETag } = await r2Client.send(uploadPart)
       parts.push({ PartNumber: i + 1, ETag })
     }
 
@@ -198,7 +186,7 @@ async function uploadToR2InChunks(key: string, buffer: Buffer, metadata: Record<
       MultipartUpload: { Parts: parts },
     })
 
-    await r2Client!.send(completeMultipartUpload)
+    await r2Client.send(completeMultipartUpload)
     return true
   } catch (error) {
     console.error('Error in multipart upload:', error)
@@ -215,7 +203,7 @@ async function uploadToR2Direct(key: string, buffer: Buffer, metadata: Record<st
       Body: buffer,
       Metadata: metadata,
     })
-    await r2Client!.send(command)
+    await r2Client.send(command)
     return true
   } catch (error) {
     console.error('Error in direct upload:', error)
@@ -227,13 +215,76 @@ async function uploadToR2Direct(key: string, buffer: Buffer, metadata: Record<st
 export async function uploadToR2(key: string, buffer: Buffer, metadata: Record<string, string>) {
   // 根据文件大小选择上传方式
   if (buffer.length > CHUNK_SIZE) {
+    console.log(`[R2] 文件大小 ${buffer.length} 字节，使用分块上传`)
     return uploadToR2InChunks(key, buffer, metadata)
   } else {
+    console.log(`[R2] 文件大小 ${buffer.length} 字节，使用直接上传`)
     return uploadToR2Direct(key, buffer, metadata)
   }
 }
 
-// 检查文件是否存在于R2
+// 从 R2 下载文件
+export async function downloadFromR2(key: string): Promise<Buffer | null> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法下载文件');
+    return null;
+  }
+
+  try {
+    console.log(`从R2下载文件: ${key}`);
+    const command = new GetObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+    });
+
+    const result = await r2Client.send(command);
+    
+    if (!result.Body) {
+      console.error(`从R2下载文件失败: ${key}, 没有返回数据`);
+      return null;
+    }
+
+    // 将流转换为 Buffer
+    const chunks: Uint8Array[] = [];
+    const stream = result.Body as any;
+    
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    
+    const buffer = Buffer.concat(chunks);
+    console.log(`从R2下载文件成功: ${key}, 大小: ${buffer.length} 字节`);
+    return buffer;
+  } catch (error) {
+    console.error('Error downloading from R2:', error);
+    return null;
+  }
+}
+
+// 生成预签名 URL
+export async function generatePresignedUrl(key: string, expiresIn = 3600): Promise<string | null> {
+  if (!r2Client) {
+    console.error('R2客户端未初始化，无法生成预签名URL');
+    return null;
+  }
+
+  try {
+    console.log(`为${key}生成预签名URL, 有效期: ${expiresIn}秒`);
+    const command = new GetObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(r2Client, command, { expiresIn });
+    console.log(`已生成预签名URL: ${url.substring(0, 50)}...`);
+    return url;
+  } catch (error) {
+    console.error('Error generating presigned URL:', error);
+    return null;
+  }
+}
+
+// 检查文件是否存在
 export async function fileExistsInR2(key: string): Promise<boolean> {
   if (!r2Client) {
     console.log('R2客户端未初始化，无法检查文件');
@@ -259,68 +310,7 @@ export async function fileExistsInR2(key: string): Promise<boolean> {
   }
 }
 
-// 从R2下载文件
-export async function downloadFromR2(key: string): Promise<Buffer | null> {
-  if (!r2Client) {
-    console.error('R2客户端未初始化，无法下载文件');
-    return null;
-  }
-
-  try {
-    console.log(`从R2下载文件: ${key}`);
-    const command = new GetObjectCommand({
-      Bucket: r2BucketName,
-      Key: key,
-    });
-
-    const result = await r2Client.send(command);
-    
-    if (!result.Body) {
-      console.error(`从R2下载文件失败: ${key}, 没有返回数据`);
-      return null;
-    }
-
-    // 转换ReadableStream为Buffer
-    const chunks: Uint8Array[] = [];
-    const stream = result.Body as any;
-    
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-    }
-    
-    const buffer = Buffer.concat(chunks);
-    console.log(`从R2下载文件成功: ${key}, 大小: ${buffer.length} 字节`);
-    return buffer;
-  } catch (error) {
-    console.error(`从R2下载文件失败: ${key}`, error);
-    return null;
-  }
-}
-
-// 生成预签名URL (有效期30分钟)
-export async function generatePresignedUrl(key: string, expiresIn: number = 30 * 60): Promise<string | null> {
-  if (!r2Client) {
-    console.error('R2客户端未初始化，无法生成预签名URL');
-    return null;
-  }
-
-  try {
-    console.log(`为${key}生成预签名URL, 有效期: ${expiresIn}秒`);
-    const command = new GetObjectCommand({
-      Bucket: r2BucketName,
-      Key: key,
-    });
-
-    const url = await getSignedUrl(r2Client, command, { expiresIn });
-    console.log(`已生成预签名URL: ${url.substring(0, 50)}...`);
-    return url;
-  } catch (error) {
-    console.error(`生成预签名URL失败: ${key}`, error);
-    return null;
-  }
-}
-
-// 删除R2对象
+// 删除文件
 export async function deleteFromR2(key: string): Promise<boolean> {
   if (!r2Client) {
     console.error('R2客户端未初始化，无法删除文件');
@@ -338,7 +328,7 @@ export async function deleteFromR2(key: string): Promise<boolean> {
     console.log(`文件已从R2删除: ${key}`);
     return true;
   } catch (error) {
-    console.error(`删除R2文件失败: ${key}`, error);
+    console.error('Error deleting from R2:', error);
     return false;
   }
 }
