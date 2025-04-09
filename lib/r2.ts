@@ -4,7 +4,10 @@ import {
   GetObjectCommand, 
   DeleteObjectCommand,
   ListObjectsV2Command,
-  HeadObjectCommand
+  HeadObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import path from 'path';
@@ -153,11 +156,117 @@ export async function validateR2Connection(): Promise<boolean> {
   }
 }
 
-// 上传文件到R2
+// 分片上传到R2
+async function uploadToR2InChunks(
+  key: string,
+  fileBuffer: Buffer,
+  metadata: Record<string, string> = {},
+  contentType = 'application/octet-stream'
+): Promise<boolean> {
+  if (!r2Client) {
+    console.warn('R2 未配置，无法上传文件:', key);
+    return false;
+  }
+
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+  const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE);
+  
+  console.log(`[R2] 开始分片上传: ${key}, 总大小: ${fileBuffer.length} 字节, 分片数: ${totalChunks}`);
+
+  try {
+    // 创建分片上传
+    const createMultipartUploadCommand = new CreateMultipartUploadCommand({
+      Bucket: r2BucketName,
+      Key: key,
+      ContentType: contentType,
+      Metadata: {
+        ...metadata,
+        'created-at': new Date().toISOString(),
+        'expires-at': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        'content-length': fileBuffer.length.toString(),
+      }
+    });
+
+    const createResponse = await r2Client.send(createMultipartUploadCommand);
+    const uploadId = createResponse.UploadId;
+
+    if (!uploadId) {
+      throw new Error('Failed to create multipart upload');
+    }
+
+    // 上传所有分片
+    const uploadParts: CompletedPart[] = [];
+    for (let partNumber = 1; partNumber <= totalChunks; partNumber++) {
+      const start = (partNumber - 1) * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, fileBuffer.length);
+      const chunk = fileBuffer.slice(start, end);
+
+      const uploadPartCommand = new UploadPartCommand({
+        Bucket: r2BucketName,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: chunk
+      });
+
+      const uploadPartResponse = await r2Client.send(uploadPartCommand);
+      uploadParts.push({
+        PartNumber: partNumber,
+        ETag: uploadPartResponse.ETag
+      });
+
+      console.log(`[R2] 上传分片 ${partNumber}/${totalChunks} 完成`);
+    }
+
+    // 完成分片上传
+    const completeMultipartUploadCommand = new CompleteMultipartUploadCommand({
+      Bucket: r2BucketName,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: uploadParts
+      }
+    });
+
+    await r2Client.send(completeMultipartUploadCommand);
+    console.log(`[R2] 分片上传完成: ${key}`);
+
+    // 验证文件是否已上传
+    const exists = await fileExistsInR2(key);
+    if (exists) {
+      console.log(`[R2] 文件验证成功: ${key}`);
+      return true;
+    } else {
+      console.warn(`[R2] 文件验证失败，可能上传不完整: ${key}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[R2] 分片上传失败: ${key}`, error);
+    return false;
+  }
+}
+
+// 修改原有的uploadToR2函数
 export async function uploadToR2(
-  key: string, 
-  fileBuffer: Buffer, 
-  metadata: Record<string, string> = {}, 
+  key: string,
+  fileBuffer: Buffer,
+  metadata: Record<string, string> = {},
+  contentType = 'application/octet-stream'
+): Promise<boolean> {
+  // 如果文件小于5MB，使用普通上传
+  if (fileBuffer.length <= 5 * 1024 * 1024) {
+    return uploadToR2Direct(key, fileBuffer, metadata, contentType);
+  }
+  
+  // 大于5MB的文件使用分片上传
+  return uploadToR2InChunks(key, fileBuffer, metadata, contentType);
+}
+
+// 原有的直接上传函数重命名为uploadToR2Direct
+async function uploadToR2Direct(
+  key: string,
+  fileBuffer: Buffer,
+  metadata: Record<string, string> = {},
   contentType = 'application/octet-stream'
 ): Promise<boolean> {
   if (!r2Client) {

@@ -166,105 +166,54 @@ async function removeShareInfo(shareId: string): Promise<void> {
 // 创建分享链接
 export async function POST(request: NextRequest) {
   try {
-    const uniqueId = `share-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    console.log(`[API:share:${uniqueId}] 开始处理创建分享请求`);
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
     
-    // 解析请求主体
-    const body = await request.json();
-    const { fileId, fileUrl, originalName, isLocalFile, fileKey } = body;
-    
-    console.log(`[API:share:${uniqueId}] 处理分享请求: fileId=${fileId}, originalName=${originalName}, ensureUploaded=${!isLocalFile}`);
-    
-    // 确保文件存在，无论是本地文件还是R2文件
-    let fileExists = false;
-    
-    if (isLocalFile) {
-      // 对于本地文件，我们检查本地文件系统
-      const localFilePath = path.join(TMP_DIR, `${fileId}.wav`);
-      console.log(`[API:share:${uniqueId}] 检查本地文件是否存在: ${localFilePath}`);
-      fileExists = fs.existsSync(localFilePath);
-      console.log(`[API:share:${uniqueId}] 本地文件${fileExists ? '存在' : '不存在'}: ${localFilePath}`);
-    } else {
-      // 对于远程文件，我们假设它存在或者直接使用传入的URL
-      // 如果提供了fileKey，尝试使用它检查R2中的文件
-      if (fileKey) {
-        console.log(`[API:share:${uniqueId}] 使用文件 key 检查: ${fileKey}`);
-        try {
-          fileExists = true; // 假定URL是有效的
-        } catch (error) {
-          console.error(`[API:share:${uniqueId}] 验证 fileKey 失败:`, error);
-          // 即使验证失败，我们也继续进行，因为URL可能仍然有效
-        }
-      } else {
-        // 尝试从URL提取key
-        try {
-          const urlObject = new URL(fileUrl);
-          const pathSegments = urlObject.pathname.split('/');
-          const extractedKey = pathSegments[pathSegments.length - 1];
-          console.log(`[API:share:${uniqueId}] 从URL中提取的key: ${extractedKey}`);
-          if (extractedKey) {
-            fileExists = true; // 假定URL是有效的
-          }
-        } catch (error) {
-          console.error(`[API:share:${uniqueId}] 从URL解析key失败:`, error);
-        }
-      }
-      
-      console.log(`[API:share:${uniqueId}] 远程文件检查结果: 存在=${fileExists}, URL=${fileUrl}`);
-    }
-    
-    if (!fileExists && !fileUrl) {
-      console.error(`[API:share:${uniqueId}] 文件不存在: fileId=${fileId}`);
+    if (!file) {
       return NextResponse.json(
-        { success: false, message: "文件不存在" },
-        { status: 404 }
+        { error: 'No file provided' },
+        { status: 400 }
       );
     }
-    
-    // 生成唯一的分享ID
-    const shareId = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
-    
-    // 准备保存的分享数据
-    const shareData = {
-      shareId,
-      fileId,
-      fileUrl,
-      originalName,
-      createdAt: new Date().toISOString(),
-      isLocalFile,
-    };
-    
-    try {
-      // 确保分享目录存在
-      if (!fs.existsSync(SHARES_DIR)) {
-        console.log(`[API:share:${uniqueId}] 创建分享目录: ${SHARES_DIR}`);
-        fs.mkdirSync(SHARES_DIR, { recursive: true });
-      }
-      
-      // 将分享数据保存到JSON文件
-      const shareFilePath = path.join(SHARES_DIR, `${shareId}.json`);
-      fs.writeFileSync(shareFilePath, JSON.stringify(shareData, null, 2));
-      console.log(`[API:share:${uniqueId}] 分享数据保存成功: ${shareFilePath}`);
-      
-      // 返回分享ID
-      return NextResponse.json({
-        success: true,
-        shareId,
-        message: "分享创建成功"
-      });
-      
-    } catch (error) {
-      console.error(`[API:share:${uniqueId}] 保存分享数据时出错:`, error);
+
+    // 检查文件大小
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { success: false, message: "服务器错误，无法保存分享数据" },
+        { error: 'File size exceeds the maximum limit of 100MB' },
+        { status: 413 }
+      );
+    }
+
+    // 生成唯一ID
+    const id = crypto.randomUUID();
+    
+    // 将文件转换为Buffer
+    const buffer = Buffer.from(await file.arrayBuffer());
+    
+    // 上传到R2
+    const success = await uploadToR2(
+      `shared/${id}`,
+      buffer,
+      {
+        'original-name': file.name,
+        'content-type': file.type,
+        'content-length': file.size.toString()
+      }
+    );
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to upload file' },
         { status: 500 }
       );
     }
-    
+
+    return NextResponse.json({ id });
   } catch (error) {
-    console.error("[API:share] 处理分享请求时出错:", error);
+    console.error('Share API error:', error);
     return NextResponse.json(
-      { success: false, message: "服务器错误" },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

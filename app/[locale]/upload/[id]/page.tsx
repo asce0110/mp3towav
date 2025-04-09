@@ -20,7 +20,8 @@ import {
   Volume2, 
   AlertTriangle, 
   Loader2, 
-  ArrowLeft 
+  ArrowLeft,
+  Zap
 } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { SiteHeader } from '@/components/site-header'
@@ -1099,7 +1100,7 @@ export default function UploadPage() {
                           disabled={!file && !originalName}
                           className="flex-1 max-w-md"
                         >
-                          <Download className="h-5 w-5 mr-2" />
+                          <Zap className="h-5 w-5 mr-2" />
                           {t('buttons.convert')}
                         </Button>
                         
