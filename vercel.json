@@ -6,11 +6,11 @@
   "functions": {
     "app/api/convert/route.ts": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 1024
     },
     "app/api/share/route.ts": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 1024
     },
     "app/api/upload-client-wav/route.js": {
       "maxDuration": 60,
